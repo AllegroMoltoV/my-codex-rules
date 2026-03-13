@@ -1,0 +1,5 @@
+.appendix/
+.tmp/
+.logs/
+.prompts/
+AGENTS.md
