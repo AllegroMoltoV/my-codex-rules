@@ -146,6 +146,19 @@ function Read-HooksFile {
     return $configuration
 }
 
+function Test-BeadsStopNudgeCommand {
+    param(
+        [AllowNull()]
+        [string]$Command
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Command)) {
+        return $false
+    }
+
+    return $Command -match '(?i)(?:^|[\\/])beads-stop-nudge\.ps1"?\s*$'
+}
+
 function Add-BeadsStopHook {
     [CmdletBinding()]
     param(
@@ -160,18 +173,27 @@ function Add-BeadsStopHook {
     $stopProperty = Get-JsonProperty -InputObject $configuration.hooks -Name 'Stop'
     $groups = if ($null -eq $stopProperty) { @() } else { @($stopProperty.Value) }
 
+    $remainingGroups = [System.Collections.Generic.List[object]]::new()
     foreach ($group in $groups) {
         $handlersProperty = Get-JsonProperty -InputObject $group -Name 'hooks'
         if ($null -eq $handlersProperty) {
+            $remainingGroups.Add($group)
             continue
         }
 
-        foreach ($handler in @($handlersProperty.Value)) {
-            $commandProperty = Get-JsonProperty -InputObject $handler -Name 'command'
-            if ($null -ne $commandProperty -and $commandProperty.Value -eq $Command) {
-                Write-Utf8JsonFile -Path $HooksPath -InputObject $configuration
-                return
+        $remainingHandlers = @(
+            foreach ($handler in @($handlersProperty.Value)) {
+                $commandProperty = Get-JsonProperty -InputObject $handler -Name 'command'
+                $commandValue = if ($null -eq $commandProperty) { $null } else { [string]$commandProperty.Value }
+                if (-not (Test-BeadsStopNudgeCommand -Command $commandValue) -and $commandValue -ne $Command) {
+                    $handler
+                }
             }
+        )
+
+        if ($remainingHandlers.Count -gt 0) {
+            Set-JsonProperty -InputObject $group -Name 'hooks' -Value $remainingHandlers
+            $remainingGroups.Add($group)
         }
     }
 
@@ -186,7 +208,7 @@ function Add-BeadsStopHook {
         )
     }
 
-    Set-JsonProperty -InputObject $configuration.hooks -Name 'Stop' -Value (@($groups) + @($managedGroup))
+    Set-JsonProperty -InputObject $configuration.hooks -Name 'Stop' -Value (@($remainingGroups) + @($managedGroup))
     Write-Utf8JsonFile -Path $HooksPath -InputObject $configuration
 }
 
@@ -222,7 +244,8 @@ function Remove-BeadsStopHook {
         $remainingHandlers = @(
             foreach ($handler in @($handlersProperty.Value)) {
                 $commandProperty = Get-JsonProperty -InputObject $handler -Name 'command'
-                if ($null -ne $commandProperty -and $commandProperty.Value -eq $Command) {
+                $commandValue = if ($null -eq $commandProperty) { $null } else { [string]$commandProperty.Value }
+                if ((Test-BeadsStopNudgeCommand -Command $commandValue) -or $commandValue -eq $Command) {
                     $changed = $true
                 }
                 else {

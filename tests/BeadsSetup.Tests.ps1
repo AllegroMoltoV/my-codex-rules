@@ -78,6 +78,39 @@ Invoke-TestCase 'Stopフックの追加は既存要素を保持し冪等であ�
     }
 }
 
+Invoke-TestCase 'Stopフックの追加は移設前の管理フックを現在のパスへ置き換える' {
+    Import-BeadsSetupModule
+    $root = New-TestDirectory
+    try {
+        $hooksPath = Join-Path $root 'hooks.json'
+        $oldCommand = 'pwsh -NoProfile -File "D:\old-codex\my-codex-rules-beads\beads-stop-nudge.ps1"'
+        $currentCommand = 'pwsh -NoProfile -File "C:\current-codex\my-codex-rules-beads\beads-stop-nudge.ps1"'
+        $data = [ordered]@{
+            hooks = [ordered]@{
+                Stop = @(
+                    [ordered]@{ hooks = @([ordered]@{ type = 'command'; command = $oldCommand }) },
+                    [ordered]@{ hooks = @([ordered]@{ type = 'command'; command = 'echo preserve' }) }
+                )
+            }
+        }
+        [System.IO.File]::WriteAllText($hooksPath, ($data | ConvertTo-Json -Depth 20), [System.Text.UTF8Encoding]::new($false))
+
+        Add-BeadsStopHook -HooksPath $hooksPath -Command $currentCommand
+
+        $parsed = [System.IO.File]::ReadAllText($hooksPath) | ConvertFrom-Json
+        $commands = @($parsed.hooks.Stop.hooks.command)
+        Assert-Equal 2 $commands.Count '置き換え後のフック数が不正です。'
+        Assert-Equal 0 (@($commands | Where-Object { $_ -eq $oldCommand }).Count) '移設前の管理フックが残りました。'
+        Assert-Equal 1 (@($commands | Where-Object { $_ -eq $currentCommand }).Count) '現在の管理フックが1件になっていません。'
+        Assert-Equal 1 (@($commands | Where-Object { $_ -eq 'echo preserve' }).Count) '利用者のフックが失われました。'
+    }
+    finally {
+        if (Test-Path -LiteralPath $root) {
+            Remove-Item -LiteralPath $root -Recurse -Force
+        }
+    }
+}
+
 Invoke-TestCase '通常の取り消しは管理フックだけを削除する' {
     Import-BeadsSetupModule
     $root = New-TestDirectory
@@ -94,6 +127,37 @@ Invoke-TestCase '通常の取り消しは管理フックだけを削除する' {
         [System.IO.File]::WriteAllText($hooksPath, ($data | ConvertTo-Json -Depth 20), [System.Text.UTF8Encoding]::new($false))
 
         Remove-BeadsStopHook -HooksPath $hooksPath -Command 'pwsh -File C:\managed\beads-stop-nudge.ps1'
+
+        $parsed = [System.IO.File]::ReadAllText($hooksPath) | ConvertFrom-Json
+        $commands = @($parsed.hooks.Stop.hooks.command)
+        Assert-Equal 1 $commands.Count '取り消し後のフック数が不正です。'
+        Assert-Equal 'echo preserve' $commands[0] '利用者のフックが失われました。'
+    }
+    finally {
+        if (Test-Path -LiteralPath $root) {
+            Remove-Item -LiteralPath $root -Recurse -Force
+        }
+    }
+}
+
+Invoke-TestCase '通常の取り消しは移設前の管理フックも削除する' {
+    Import-BeadsSetupModule
+    $root = New-TestDirectory
+    try {
+        $hooksPath = Join-Path $root 'hooks.json'
+        $oldCommand = 'pwsh -NoProfile -File "D:\old-codex\my-codex-rules-beads\beads-stop-nudge.ps1"'
+        $currentCommand = 'pwsh -NoProfile -File "C:\current-codex\my-codex-rules-beads\beads-stop-nudge.ps1"'
+        $data = [ordered]@{
+            hooks = [ordered]@{
+                Stop = @(
+                    [ordered]@{ hooks = @([ordered]@{ type = 'command'; command = 'echo preserve' }) },
+                    [ordered]@{ hooks = @([ordered]@{ type = 'command'; command = $oldCommand }) }
+                )
+            }
+        }
+        [System.IO.File]::WriteAllText($hooksPath, ($data | ConvertTo-Json -Depth 20), [System.Text.UTF8Encoding]::new($false))
+
+        Remove-BeadsStopHook -HooksPath $hooksPath -Command $currentCommand
 
         $parsed = [System.IO.File]::ReadAllText($hooksPath) | ConvertFrom-Json
         $commands = @($parsed.hooks.Stop.hooks.command)
