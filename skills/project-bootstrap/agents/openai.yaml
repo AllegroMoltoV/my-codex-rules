@@ -1,0 +1,4 @@
+interface:
+  display_name: "プロジェクト初期セットアップ"
+  short_description: "Codex ルールと Beads 進捗管理を安全に初期設定"
+  default_prompt: "Use $project-bootstrap to initialize this repository with Codex rules and Beads task tracking."
