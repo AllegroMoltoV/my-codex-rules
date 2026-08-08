@@ -15,18 +15,6 @@ function Test-CommandAvailable {
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
-function Copy-TemplateIfMissing {
-    param(
-        [string]$Source,
-        [string]$Destination
-    )
-    if ([System.IO.File]::Exists($Destination)) {
-        return
-    }
-    [System.IO.Directory]::CreateDirectory((Split-Path -Parent $Destination)) | Out-Null
-    [System.IO.File]::WriteAllBytes($Destination, [System.IO.File]::ReadAllBytes($Source))
-}
-
 function Add-ExcludeEntries {
     param(
         [string]$ExcludePath,
@@ -85,10 +73,8 @@ if (-not [System.IO.Directory]::Exists($gitMarker) -and -not [System.IO.File]::E
 }
 
 $assetsPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'assets'
-$agentsTemplate = Join-Path $assetsPath 'AGENTS.md'
-$initTemplate = Join-Path $assetsPath 'INIT.md'
 $excludeTemplate = Join-Path $assetsPath 'exclude'
-foreach ($template in @($agentsTemplate, $initTemplate, $excludeTemplate)) {
+foreach ($template in @($excludeTemplate)) {
     if (-not [System.IO.File]::Exists($template)) {
         throw "配布テンプレートがありません: $template"
     }
@@ -108,9 +94,6 @@ foreach ($directory in @(
 )) {
     [System.IO.Directory]::CreateDirectory((Join-Path $target $directory)) | Out-Null
 }
-
-Copy-TemplateIfMissing -Source $agentsTemplate -Destination (Join-Path $target 'AGENTS.md')
-Copy-TemplateIfMissing -Source $initTemplate -Destination (Join-Path $target '.prompts\INIT.md')
 
 $indexPath = Join-Path $target 'docs\INDEX.md'
 if (-not [System.IO.File]::Exists($indexPath)) {
@@ -146,6 +129,16 @@ if (-not $NoBeads -and -not [System.IO.File]::Exists($optOutPath)) {
     $originalLocation = Get-Location
     try {
         Set-Location -LiteralPath $target
+        $beadsRole = @(& $GitCommand config --local --get beads.role)
+        if ($LASTEXITCODE -notin @(0, 1)) {
+            throw 'Gitのローカルbeads.roleを確認できません。'
+        }
+        if ([string]::IsNullOrWhiteSpace(($beadsRole -join ''))) {
+            & $GitCommand config --local beads.role maintainer
+            if ($LASTEXITCODE -ne 0) {
+                throw 'Gitのローカルbeads.roleを設定できません。'
+            }
+        }
         & $BdCommand init --stealth --skip-agents --non-interactive --init-if-missing
         if ($LASTEXITCODE -ne 0) {
             throw 'Beadsの初期化に失敗しました。'

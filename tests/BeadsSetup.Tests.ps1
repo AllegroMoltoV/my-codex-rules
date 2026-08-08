@@ -2,6 +2,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $modulePath = Join-Path $repoRoot 'scripts\lib\BeadsSetup.psm1'
 $setupPath = Join-Path $repoRoot 'scripts\setup-beads.ps1'
 $teardownPath = Join-Path $repoRoot 'scripts\teardown-beads.ps1'
+$rulesPath = Join-Path $repoRoot 'rules\AGENTS.md'
 
 function Import-BeadsSetupModule {
     Assert-PathExists $modulePath
@@ -203,4 +204,11 @@ Invoke-TestCase 'バックアップ復元は存在状態とバイト列を戻す
 Invoke-TestCase 'セットアップと取り消しのスクリプトが存在する' {
     Assert-PathExists $setupPath
     Assert-PathExists $teardownPath
+}
+
+Invoke-TestCase 'グローバルセットアップは共通ルールを管理対象にする' {
+    Assert-PathExists $rulesPath
+    $setup = [System.IO.File]::ReadAllText($setupPath)
+    Assert-True ($setup.Contains('rules\AGENTS.md')) 'グローバルルールの配布元がありません。'
+    Assert-True ($setup.Contains('global_agents_digest')) 'グローバルAGENTS.mdの管理ハッシュがありません。'
 }

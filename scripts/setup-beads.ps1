@@ -114,8 +114,13 @@ foreach ($entry in @(
 }
 
 $paths = Get-BeadsManagedPaths -HomePath $HomePath -CodexHome $CodexHome
+$globalAgentsPath = Join-Path $paths.CodexHome 'AGENTS.md'
+$sourceRulesPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'rules\AGENTS.md'
 $sourceSkillPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'skills\project-bootstrap'
 $sourceNudgePath = Join-Path $PSScriptRoot 'beads-stop-nudge.ps1'
+if (-not [System.IO.File]::Exists($sourceRulesPath)) {
+    throw "グローバルルールがありません: $sourceRulesPath"
+}
 if (-not [System.IO.Directory]::Exists($sourceSkillPath)) {
     throw "project-bootstrapスキルがありません: $sourceSkillPath"
 }
@@ -129,6 +134,21 @@ if ([System.IO.File]::Exists($paths.StatePath)) {
     $previousState = [System.IO.File]::ReadAllText($paths.StatePath) | ConvertFrom-Json
 }
 
+$expectedGlobalAgentsDigest = $null
+if (
+    $null -ne $previousState -and
+    [bool]$previousState.installed -and
+    $null -ne $previousState.PSObject.Properties['global_agents_digest']
+) {
+    $expectedGlobalAgentsDigest = [string]$previousState.global_agents_digest
+}
+if (-not [string]::IsNullOrWhiteSpace($expectedGlobalAgentsDigest)) {
+    $currentGlobalAgentsDigest = Get-FileDigest -Path $globalAgentsPath
+    if ($currentGlobalAgentsDigest -ne $expectedGlobalAgentsDigest) {
+        throw "導入後に変更されたグローバルAGENTS.mdは上書きしません: $globalAgentsPath"
+    }
+}
+
 $expectedSkillDigest = if ($null -ne $previousState -and [bool]$previousState.installed) { [string]$previousState.project_bootstrap_digest } else { $null }
 if ([System.IO.Directory]::Exists($paths.ProjectBootstrapPath)) {
     $existingSkillDigest = Get-TreeDigest -Path $paths.ProjectBootstrapPath
@@ -138,7 +158,11 @@ if ([System.IO.Directory]::Exists($paths.ProjectBootstrapPath)) {
 }
 
 $backupManifest = $null
-if ($null -ne $previousState -and [bool]$previousState.installed) {
+if (
+    $null -ne $previousState -and
+    [bool]$previousState.installed -and
+    -not [string]::IsNullOrWhiteSpace($expectedGlobalAgentsDigest)
+) {
     $backupManifest = [string]$previousState.backup_manifest
 }
 else {
@@ -149,6 +173,7 @@ else {
 $officialSetupStarted = $false
 $skillCopied = $false
 try {
+    [System.IO.File]::WriteAllBytes($globalAgentsPath, [System.IO.File]::ReadAllBytes($sourceRulesPath))
     Invoke-IsolatedBd -Arguments @('metrics', 'off')
     $officialSetupStarted = $true
     Invoke-IsolatedBd -Arguments @('setup', 'codex', '--global')
@@ -161,13 +186,14 @@ try {
     $skillDigest = Copy-OwnedTree -Source $sourceSkillPath -Destination $paths.ProjectBootstrapPath -ExpectedDigest $expectedSkillDigest
     $skillCopied = $true
     $state = [pscustomobject]@{
-        version = 1
+        version = 2
         installed = $true
         installed_at = [DateTimeOffset]::UtcNow.ToString('o')
         home_path = $paths.HomePath
         codex_home = $paths.CodexHome
         backup_manifest = $backupManifest
         hook_command = $hookCommand
+        global_agents_digest = Get-FileDigest -Path $globalAgentsPath
         nudge_digest = Get-FileDigest -Path $paths.NudgeScriptPath
         project_bootstrap_digest = $skillDigest
         dependency_versions = $versions
@@ -196,7 +222,7 @@ catch {
     throw $setupError
 }
 
-Write-Host "BeadsのCodex統合を設定しました。"
+Write-Host '共通ルール、project-bootstrap、BeadsのCodex統合を設定しました。'
 Write-Host "bd: $($versions.bd)"
 Write-Host "jq: $($versions.jq)"
 Write-Host "codex: $($versions.codex)"

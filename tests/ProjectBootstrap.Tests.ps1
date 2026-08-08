@@ -2,6 +2,17 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $bootstrapPath = Join-Path $repoRoot 'scripts\bootstrap.ps1'
 $skillPath = Join-Path $repoRoot 'skills\project-bootstrap\SKILL.md'
 $skillMetadataPath = Join-Path $repoRoot 'skills\project-bootstrap\agents\openai.yaml'
+$initPath = Join-Path $repoRoot '.prompts\INIT.md'
+$duplicatedInitPath = Join-Path $repoRoot 'skills\project-bootstrap\assets\INIT.md'
+$duplicatedAgentsPath = Join-Path $repoRoot 'skills\project-bootstrap\assets\AGENTS.md'
+
+Invoke-TestCase 'INITは唯一の配布用正本としてproject-bootstrapを呼び出す' {
+    Assert-PathExists $initPath
+    $init = [System.IO.File]::ReadAllText($initPath)
+    Assert-True ($init.Contains('$project-bootstrap を使って、このプロジェクトを初期セットアップしてください。')) 'INITにproject-bootstrapの呼び出しがありません。'
+    Assert-True (-not [System.IO.File]::Exists($duplicatedInitPath)) 'スキル内にINITの複製があります。'
+    Assert-True (-not [System.IO.File]::Exists($duplicatedAgentsPath)) 'スキル内に共通AGENTS.mdの複製があります。'
+}
 
 Invoke-TestCase 'プロジェクト初期化は既存ファイルを上書きしない' {
     Assert-PathExists $bootstrapPath
@@ -28,6 +39,26 @@ Invoke-TestCase 'プロジェクト初期化は既存ファイルを上書きし
     }
 }
 
+Invoke-TestCase 'プロジェクト初期化は共通AGENTS.mdとINITを生成しない' {
+    Assert-PathExists $bootstrapPath
+    $root = New-TestDirectory
+    try {
+        $gitDir = Join-Path $root '.git\info'
+        [System.IO.Directory]::CreateDirectory($gitDir) | Out-Null
+
+        & $bootstrapPath -TargetPath $root -NoBeads
+
+        Assert-True (-not [System.IO.File]::Exists((Join-Path $root 'AGENTS.md'))) 'bootstrapが共通AGENTS.mdを生成しました。'
+        Assert-True (-not [System.IO.File]::Exists((Join-Path $root '.prompts\INIT.md'))) 'bootstrapがINIT.mdを生成しました。'
+        Assert-True ([System.IO.File]::Exists((Join-Path $root 'docs\INDEX.md'))) 'docs/INDEX.mdが作成されませんでした。'
+    }
+    finally {
+        if (Test-Path -LiteralPath $root) {
+            Remove-Item -LiteralPath $root -Recurse -Force
+        }
+    }
+}
+
 Invoke-TestCase 'NoBeadsとopt-outはBeadsを呼ばない' {
     Assert-PathExists $bootstrapPath
     $root = New-TestDirectory
@@ -36,7 +67,38 @@ Invoke-TestCase 'NoBeadsとopt-outはBeadsを呼ばない' {
         [System.IO.Directory]::CreateDirectory($gitDir) | Out-Null
         [System.IO.File]::WriteAllText((Join-Path $root '.beads-optout'), '')
         & $bootstrapPath -TargetPath $root -BdCommand 'missing-bd-command'
+        Assert-True (-not [System.IO.File]::Exists((Join-Path $root '.prompts\INIT.md'))) 'bootstrapがINIT.mdを生成しました。'
         & $bootstrapPath -TargetPath $root -NoBeads -BdCommand 'missing-bd-command'
+    }
+    finally {
+        if (Test-Path -LiteralPath $root) {
+            Remove-Item -LiteralPath $root -Recurse -Force
+        }
+    }
+}
+
+Invoke-TestCase 'Beads初期化前にローカル役割と除外設定を補う' {
+    Assert-PathExists $bootstrapPath
+    $root = New-TestDirectory
+    try {
+        $fakeBd = Join-Path $root 'fake-bd.cmd'
+        [System.IO.File]::WriteAllText($fakeBd, "@exit /b 0`r`n", [System.Text.Encoding]::ASCII)
+
+        & $bootstrapPath -TargetPath $root -BdCommand $fakeBd
+
+        $originalLocation = Get-Location
+        try {
+            Set-Location -LiteralPath $root
+            $role = @(& git config --local --get beads.role)
+            Assert-Equal 0 $LASTEXITCODE 'beads.roleを読み取れませんでした。'
+            Assert-Equal 'maintainer' (($role -join '').Trim()) '未設定のbeads.roleがmaintainerになっていません。'
+        }
+        finally {
+            Set-Location -LiteralPath $originalLocation
+        }
+
+        $exclude = [System.IO.File]::ReadAllText((Join-Path $root '.git\info\exclude'))
+        Assert-True ($exclude.Contains('.beads/')) '.beads/がローカル除外設定にありません。'
     }
     finally {
         if (Test-Path -LiteralPath $root) {
@@ -79,26 +141,20 @@ Invoke-TestCase 'PowerShellファイルに構文エラーがない' {
     }
 }
 
-Invoke-TestCase '配布テンプレートが原本と一致する' {
-    $pairs = @(
-        @((Join-Path $repoRoot 'rules\AGENTS.md'), (Join-Path $repoRoot 'skills\project-bootstrap\assets\AGENTS.md')),
-        @((Join-Path $repoRoot '.prompts\INIT.md'), (Join-Path $repoRoot 'skills\project-bootstrap\assets\INIT.md')),
-        @((Join-Path $repoRoot 'exclude'), (Join-Path $repoRoot 'skills\project-bootstrap\assets\exclude'))
-    )
-    foreach ($pair in $pairs) {
-        $source = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($pair[0]))
-        $asset = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($pair[1]))
-        Assert-Equal $source $asset "配布テンプレートが原本と一致しません: $($pair[0])"
-    }
+Invoke-TestCase '除外設定の配布テンプレートが原本と一致する' {
+    $sourcePath = Join-Path $repoRoot 'exclude'
+    $assetPath = Join-Path $repoRoot 'skills\project-bootstrap\assets\exclude'
+    $source = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($sourcePath))
+    $asset = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($assetPath))
+    Assert-Equal $source $asset "配布テンプレートが原本と一致しません: $sourcePath"
 }
 
-Invoke-TestCase 'READMEと配布ルールがBeadsの役割を一致して説明する' {
+Invoke-TestCase 'READMEは通常利用を二段階で説明する' {
     $readme = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'README.md'))
-    $rules = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'rules\AGENTS.md'))
-    $init = [System.IO.File]::ReadAllText((Join-Path $repoRoot '.prompts\INIT.md'))
-    foreach ($contentItem in @($readme, $rules, $init)) {
-        Assert-True ($contentItem.Contains('Beads')) 'Beadsの説明がありません。'
-        Assert-True ($contentItem.Contains('.prompts/PLANS')) '計画ファイルの役割がありません。'
-    }
-    Assert-True (-not $readme.Contains('exclude` で置き換えて')) 'READMEに古いexclude置換手順が残っています。'
+    Assert-True ($readme.Contains('フェーズ 1: グローバルの初回セットアップ')) 'グローバル導入のフェーズがありません。'
+    Assert-True ($readme.Contains('フェーズ 2: プロジェクトのセットアップ')) 'プロジェクト初期設定のフェーズがありません。'
+    Assert-True ($readme.Contains('scripts/setup-beads.ps1')) 'グローバル導入コマンドがありません。'
+    Assert-True ($readme.Contains('.prompts/INIT.md')) 'INITのコピー元がありません。'
+    Assert-True ($readme.Contains('`.prompts/INIT.md` を実行してください')) 'INITの実行依頼がありません。'
+    Assert-True (-not $readme.Contains('scripts/bootstrap.ps1 -TargetPath')) '内部bootstrapの直接実行が通常導線に残っています。'
 }

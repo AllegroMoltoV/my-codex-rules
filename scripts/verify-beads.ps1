@@ -177,6 +177,12 @@ try {
     Assert-Condition ($afterFirstSetup.beads_skill -ne 'missing') '公式Beadsスキルが配置されませんでした。'
     Assert-Condition ($afterFirstSetup.bootstrap_skill -ne 'missing') 'project-bootstrapスキルが配置されませんでした。'
     Assert-Condition ($afterFirstSetup.nudge -ne 'missing') '記録漏れ通知スクリプトが配置されませんでした。'
+    $globalAgentsPath = Join-Path $normalEnvironment.CodexHome 'AGENTS.md'
+    $globalAgents = [System.IO.File]::ReadAllText($globalAgentsPath)
+    Assert-Condition ($globalAgents.Contains('憶測で作業を行わず確かな根拠に基づいて作業を実施してください')) '共通ルールがグローバルAGENTS.mdへ導入されませんでした。'
+    $statePath = Join-Path $normalEnvironment.CodexHome 'my-codex-rules-beads\state.json'
+    $state = [System.IO.File]::ReadAllText($statePath) | ConvertFrom-Json
+    Assert-Condition (-not [string]::IsNullOrWhiteSpace([string]$state.global_agents_digest)) 'グローバルAGENTS.mdの管理ハッシュが記録されませんでした。'
 
     $hooksPath = Join-Path $normalEnvironment.CodexHome 'hooks.json'
     $hooksObject = [System.IO.File]::ReadAllText($hooksPath) | ConvertFrom-Json
@@ -200,13 +206,27 @@ try {
         Assert-Same $afterFirstSetup[$key] $afterSecondSetup[$key] "再実行後のハッシュが変わりました: $key"
     }
 
+    $managedAgentsBytes = [System.IO.File]::ReadAllBytes($globalAgentsPath)
+    [System.IO.File]::AppendAllText($globalAgentsPath, "`n利用者が追加したグローバルルール")
+    $modifiedAgentsHash = Get-FileHashOrState -Path $globalAgentsPath
+    $modifiedSetupRejected = $false
+    try {
+        Invoke-Setup -Environment $normalEnvironment
+    }
+    catch {
+        $modifiedSetupRejected = $_.Exception.Message.Contains('導入後に変更されたグローバルAGENTS.mdは上書きしません')
+    }
+    Assert-Condition $modifiedSetupRejected '変更済みのグローバルAGENTS.mdを再実行が拒否しませんでした。'
+    Assert-Same $modifiedAgentsHash (Get-FileHashOrState -Path $globalAgentsPath) '拒否後にグローバルAGENTS.mdが変更されました。'
+    [System.IO.File]::WriteAllBytes($globalAgentsPath, $managedAgentsBytes)
+
     $projectPath = Join-Path $normalEnvironment.Root 'project'
     [System.IO.Directory]::CreateDirectory($projectPath) | Out-Null
     Invoke-WithEnvironment -Environment $normalEnvironment -Action {
         & (Join-Path $repoRoot 'scripts\bootstrap.ps1') -TargetPath $projectPath
         Assert-Condition ([System.IO.Directory]::Exists((Join-Path $projectPath '.beads'))) 'bootstrapでBeadsが初期化されませんでした。'
-        Assert-Condition ([System.IO.File]::Exists((Join-Path $projectPath 'AGENTS.md'))) 'bootstrapでAGENTS.mdが配置されませんでした。'
-        Assert-Condition ([System.IO.File]::Exists((Join-Path $projectPath '.prompts\INIT.md'))) 'bootstrapでINIT.mdが配置されませんでした。'
+        Assert-Condition (-not [System.IO.File]::Exists((Join-Path $projectPath 'AGENTS.md'))) 'bootstrapが共通AGENTS.mdを生成しました。'
+        Assert-Condition (-not [System.IO.File]::Exists((Join-Path $projectPath '.prompts\INIT.md'))) 'bootstrapがINIT.mdを生成しました。'
         Assert-Condition ([System.IO.File]::Exists((Join-Path $projectPath 'docs\INDEX.md'))) 'bootstrapで文書索引が配置されませんでした。'
 
         $originalLocation = Get-Location
@@ -256,6 +276,8 @@ try {
     Assert-Condition ($remainingCommands -contains 'echo preserve-this-hook') '通常取り消しで既存フックが失われました。'
     Assert-Condition ($remainingCommands -contains 'echo user-added-after-setup') '通常取り消しで導入後の利用者フックが失われました。'
     Assert-Condition (-not ($remainingCommands | Where-Object { $_ -like '*beads-stop-nudge.ps1*' })) '通常取り消し後も独自フックが残っています。'
+    $agentsAfterNormalRemoval = [System.IO.File]::ReadAllText((Join-Path $normalEnvironment.CodexHome 'AGENTS.md'))
+    Assert-Condition ($agentsAfterNormalRemoval.Contains('憶測で作業を行わず確かな根拠に基づいて作業を実施してください')) '通常取り消しで共通ルールが失われました。'
 
     $restoreEnvironment = New-IsolatedEnvironment -Name 'restore' -ConfigMissing
     $restoreBefore = Get-ManagedSnapshot -Environment $restoreEnvironment

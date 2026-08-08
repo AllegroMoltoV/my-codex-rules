@@ -1,6 +1,6 @@
 # AGENTS.md
 
-このファイルを、対象プロジェクトのルートへ `AGENTS.md` としてコピーして使ってください。
+このファイルは、`scripts/setup-beads.ps1` が `$CODEX_HOME/AGENTS.md` へ配置する共通ルールの原本です。対象プロジェクト固有の規則が必要な場合だけ、そのプロジェクトへ別の `AGENTS.md` を作成してください。
 
 ## Project Rules
 
