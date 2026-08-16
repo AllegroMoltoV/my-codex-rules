@@ -123,6 +123,15 @@ Invoke-TestCase 'Codexスキルのメタデータが仕様を満たす' {
     Assert-True ($metadata.Contains('short_description:')) 'short_descriptionがありません。'
     Assert-True ($metadata.Contains('default_prompt:')) 'default_promptがありません。'
     Assert-True ($metadata.Contains('$project-bootstrap')) 'default_promptにスキル名がありません。'
+    Assert-True ($metadata.Contains('allow_implicit_invocation: false')) '状態を変更するスキルの暗黙起動が禁止されていません。'
+}
+
+Invoke-TestCase 'project-bootstrapは保護されたGit除外設定の扱いを説明する' {
+    Assert-PathExists $skillPath
+    $content = [System.IO.File]::ReadAllText($skillPath)
+    Assert-True ($content.Contains('.git/info/exclude')) '.git/info/excludeの更新説明がありません。'
+    Assert-True ($content.Contains('権限昇格')) '狭い権限昇格が必要になる場合の説明がありません。'
+    Assert-True ($content.Contains('未完了')) '権限昇格が拒否された場合の報告方法がありません。'
 }
 
 Invoke-TestCase 'PowerShellファイルに構文エラーがない' {

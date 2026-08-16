@@ -7,6 +7,8 @@ description: Initialize a new or existing project after the user invokes a copie
 
 このスキルは、グローバル初期設定を終えた端末で、別途作成した対象プロジェクトを初期設定する。共通ルールとこのスキル自体はグローバル領域から読み込まれている前提とする。
 
+`.prompts/INIT.md` または利用者が `$project-bootstrap` を明示した場合だけ実行する。状態を変更するため、依頼文から暗黙に起動しない。
+
 ## 入力の確認
 
 1. 対象ディレクトリを特定する。通常は現在の作業ディレクトリを使い、不明な場合だけ利用者へ確認する。
@@ -25,6 +27,8 @@ pwsh -NoProfile -File scripts/bootstrap.ps1 -TargetPath <対象ディレクト�
 ```
 
 Beads を使わないよう利用者から指示された場合は、`-NoBeads` を付ける。`.beads-optout` がある場合も Beads を初期化しない。
+
+`workspace-write` でも `.git/info/exclude` が保護される環境では、対象プロジェクトと上記の bootstrap コマンドに限定して権限昇格を求める。権限昇格を拒否された場合は成功扱いにせず、除外設定が未完了であることを報告する。サンドボックス全体は無効にしない。
 
 スクリプトは次の処理だけを行う。
 

@@ -27,7 +27,7 @@ function ConvertTo-CanonicalJsonValue {
     }
     if ($Value -is [System.Management.Automation.PSCustomObject]) {
         $result = [ordered]@{}
-        $names = @($Value.PSObject.Properties.Name)
+        $names = @($Value.PSObject.Properties | ForEach-Object { $_.Name })
         [Array]::Sort($names, [System.StringComparer]::Ordinal)
         foreach ($name in $names) {
             $result[$name] = ConvertTo-CanonicalJsonValue -Value $Value.PSObject.Properties[$name].Value
@@ -63,6 +63,201 @@ function Write-Utf8JsonFile {
         if (Test-Path -LiteralPath $temporaryPath) {
             Remove-Item -LiteralPath $temporaryPath -Force
         }
+    }
+}
+
+function Remove-TomlComment {
+    param([string]$Line)
+
+    $quote = [char]0
+    $escaped = $false
+    for ($index = 0; $index -lt $Line.Length; $index++) {
+        $character = $Line[$index]
+        if ($quote -eq [char]0) {
+            if ($character -eq '#') {
+                return $Line.Substring(0, $index)
+            }
+            if ($character -eq '"' -or $character -eq "'") {
+                $quote = $character
+            }
+            continue
+        }
+
+        if ($quote -eq '"' -and $character -eq '\' -and -not $escaped) {
+            $escaped = $true
+            continue
+        }
+        if ($character -eq $quote -and -not $escaped) {
+            $quote = [char]0
+        }
+        $escaped = $false
+    }
+    return $Line
+}
+
+function Get-TomlOpenMultilineDelimiter {
+    param([string]$Code)
+
+    $state = 'Normal'
+    $delimiter = $null
+    $escaped = $false
+    for ($index = 0; $index -lt $Code.Length; $index++) {
+        $character = $Code[$index]
+        $threeCharacters = if ($index + 2 -lt $Code.Length) { $Code.Substring($index, 3) } else { $null }
+
+        if ($state -eq 'Multiline') {
+            if ($threeCharacters -eq $delimiter) {
+                $state = 'Normal'
+                $delimiter = $null
+                $index += 2
+            }
+            continue
+        }
+        if ($state -eq 'Basic') {
+            if ($character -eq '\' -and -not $escaped) {
+                $escaped = $true
+                continue
+            }
+            if ($character -eq '"' -and -not $escaped) {
+                $state = 'Normal'
+            }
+            $escaped = $false
+            continue
+        }
+        if ($state -eq 'Literal') {
+            if ($character -eq "'") {
+                $state = 'Normal'
+            }
+            continue
+        }
+
+        if ($threeCharacters -eq '"""' -or $threeCharacters -eq "'''") {
+            $state = 'Multiline'
+            $delimiter = $threeCharacters
+            $index += 2
+        }
+        elseif ($character -eq '"') {
+            $state = 'Basic'
+        }
+        elseif ($character -eq "'") {
+            $state = 'Literal'
+        }
+    }
+
+    if ($state -eq 'Multiline') {
+        return $delimiter
+    }
+    return $null
+}
+
+function Add-CodexApprovalDefaults {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ConfigPath
+    )
+
+    $content = if ([System.IO.File]::Exists($ConfigPath)) {
+        [System.IO.File]::ReadAllText($ConfigPath)
+    }
+    else {
+        ''
+    }
+    $newLine = if ($content.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $lines = @($content -split '\r?\n', 0)
+    $firstTableLine = $lines.Count
+    $approvalLines = [System.Collections.Generic.List[string]]::new()
+    $reviewerLines = [System.Collections.Generic.List[string]]::new()
+    $multilineDelimiter = $null
+
+    for ($index = 0; $index -lt $lines.Count; $index++) {
+        $line = $lines[$index]
+        if ($null -ne $multilineDelimiter) {
+            if ($line.Contains($multilineDelimiter)) {
+                $multilineDelimiter = $null
+            }
+            continue
+        }
+
+        $code = Remove-TomlComment -Line $line
+        $multilineDelimiter = Get-TomlOpenMultilineDelimiter -Code $code
+
+        if ($code -match '^\s*\[\[?[^\]]+\]\]?\s*$') {
+            $firstTableLine = $index
+            break
+        }
+        if ($code -match '^\s*(?:approval_policy|"approval_policy"|''approval_policy'')\s*=') {
+            $approvalLines.Add($line)
+        }
+        if ($code -match '^\s*(?:approvals_reviewer|"approvals_reviewer"|''approvals_reviewer'')\s*=') {
+            $reviewerLines.Add($line)
+        }
+    }
+
+    if ($approvalLines.Count -gt 1) {
+        throw "config.tomlのルートにapproval_policyが重複しています: $ConfigPath"
+    }
+    if ($reviewerLines.Count -gt 1) {
+        throw "config.tomlのルートにapprovals_reviewerが重複しています: $ConfigPath"
+    }
+
+    $approvalMatchesDefault = $approvalLines.Count -eq 0 -or $approvalLines[0] -match '^\s*(?:approval_policy|"approval_policy"|''approval_policy'')\s*=\s*["'']on-request["'']\s*(?:#.*)?$'
+    $reviewerMatchesDefault = $reviewerLines.Count -eq 0 -or $reviewerLines[0] -match '^\s*(?:approvals_reviewer|"approvals_reviewer"|''approvals_reviewer'')\s*=\s*["'']auto_review["'']\s*(?:#.*)?$'
+    $missingLines = [System.Collections.Generic.List[string]]::new()
+    if ($approvalLines.Count -eq 0) {
+        $missingLines.Add('approval_policy = "on-request"')
+    }
+    if ($reviewerLines.Count -eq 0) {
+        $missingLines.Add('approvals_reviewer = "auto_review"')
+    }
+
+    if ($missingLines.Count -gt 0) {
+        $rootLines = [System.Collections.Generic.List[string]]::new()
+        for ($index = 0; $index -lt $firstTableLine; $index++) {
+            $rootLines.Add($lines[$index])
+        }
+        while ($rootLines.Count -gt 0 -and [string]::IsNullOrWhiteSpace($rootLines[$rootLines.Count - 1])) {
+            $rootLines.RemoveAt($rootLines.Count - 1)
+        }
+        if ($rootLines.Count -gt 0) {
+            $rootLines.Add('')
+        }
+        foreach ($line in $missingLines) {
+            $rootLines.Add($line)
+        }
+        if ($firstTableLine -lt $lines.Count) {
+            $rootLines.Add('')
+            for ($index = $firstTableLine; $index -lt $lines.Count; $index++) {
+                $rootLines.Add($lines[$index])
+            }
+        }
+
+        $updated = [string]::Join($newLine, $rootLines)
+        if (-not $updated.EndsWith($newLine, [System.StringComparison]::Ordinal)) {
+            $updated += $newLine
+        }
+        $directory = Split-Path -Parent $ConfigPath
+        if ($directory) {
+            [System.IO.Directory]::CreateDirectory($directory) | Out-Null
+        }
+        $temporaryPath = "$ConfigPath.$([guid]::NewGuid().ToString('N')).tmp"
+        try {
+            [System.IO.File]::WriteAllText($temporaryPath, $updated, [System.Text.UTF8Encoding]::new($false))
+            [System.IO.File]::Move($temporaryPath, $ConfigPath, $true)
+        }
+        finally {
+            if (Test-Path -LiteralPath $temporaryPath) {
+                Remove-Item -LiteralPath $temporaryPath -Force
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        ApprovalPolicyExisted = $approvalLines.Count -eq 1
+        ApprovalPolicyMatchesDefault = $approvalMatchesDefault
+        ApprovalsReviewerExisted = $reviewerLines.Count -eq 1
+        ApprovalsReviewerMatchesDefault = $reviewerMatchesDefault
+        Changed = $missingLines.Count -gt 0
     }
 }
 
@@ -401,10 +596,13 @@ function Get-BeadsManagedPaths {
         StatePath = Join-Path $runtimeRoot 'state.json'
         BackupRoot = Join-Path $runtimeRoot 'backup'
         ProjectBootstrapPath = Join-Path $resolvedHome '.agents\skills\project-bootstrap'
+        JapaneseTechnicalWritingPath = Join-Path $resolvedHome '.agents\skills\japanese-technical-writing'
+        BeadsSkillPath = Join-Path $resolvedHome '.agents\skills\beads'
     }
 }
 
 Export-ModuleMember -Function @(
+    'Add-CodexApprovalDefaults',
     'Add-BeadsStopHook',
     'Get-BeadsManagedPaths',
     'New-BeadsBackup',

@@ -77,7 +77,8 @@ function New-TestDirectory {
 $testFiles = @(
     'BeadsSetup.Tests.ps1',
     'BeadsStopNudge.Tests.ps1',
-    'ProjectBootstrap.Tests.ps1'
+    'ProjectBootstrap.Tests.ps1',
+    'Rules.Tests.ps1'
 )
 
 foreach ($testFile in $testFiles) {

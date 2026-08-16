@@ -5,7 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$testRoot = Join-Path $repoRoot ('.tmp\beads-integration-' + [guid]::NewGuid().ToString('N'))
+$testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('my-codex-rules-beads-integration-' + [guid]::NewGuid().ToString('N'))
 $actualHome = if ($env:USERPROFILE) { [System.IO.Path]::GetFullPath($env:USERPROFILE) } else { [System.IO.Path]::GetFullPath($env:HOME) }
 $actualCodexHome = if ($env:CODEX_HOME) { [System.IO.Path]::GetFullPath($env:CODEX_HOME) } else { Join-Path $actualHome '.codex' }
 
@@ -52,6 +52,7 @@ function Get-UserSnapshot {
         config = Get-FileHashOrState -Path (Join-Path $actualCodexHome 'config.toml')
         beads_skill = Get-DirectoryHashOrState -Path (Join-Path $actualHome '.agents\skills\beads')
         bootstrap_skill = Get-DirectoryHashOrState -Path (Join-Path $actualHome '.agents\skills\project-bootstrap')
+        writing_skill = Get-DirectoryHashOrState -Path (Join-Path $actualHome '.agents\skills\japanese-technical-writing')
         metrics = Get-FileHashOrState -Path (Join-Path $actualHome '.config\bd\config.yaml')
     }
 }
@@ -71,15 +72,17 @@ function New-IsolatedEnvironment {
     $root = Join-Path $testRoot $Name
     $isolatedHome = Join-Path $root 'home'
     $codexHome = Join-Path $root 'codex-home'
+    $doctorRoot = Join-Path $root 'doctor-project'
     [System.IO.Directory]::CreateDirectory($isolatedHome) | Out-Null
     [System.IO.Directory]::CreateDirectory($codexHome) | Out-Null
+    [System.IO.Directory]::CreateDirectory((Join-Path $doctorRoot '.git')) | Out-Null
     [System.IO.File]::WriteAllBytes((Join-Path $codexHome 'AGENTS.md'), [byte[]](0xEF, 0xBB, 0xBF, 0x70, 0x72, 0x65, 0x73, 0x65, 0x72, 0x76, 0x65, 0x0D, 0x0A))
     $hooks = '{"description":"preserve","hooks":{"Stop":[{"hooks":[{"type":"command","command":"echo preserve-this-hook"}]}]}}'
     [System.IO.File]::WriteAllText((Join-Path $codexHome 'hooks.json'), $hooks, [System.Text.UTF8Encoding]::new($false))
     if (-not $ConfigMissing) {
         [System.IO.File]::WriteAllText((Join-Path $codexHome 'config.toml'), "model = 'preserve-model'`r`n", [System.Text.UTF8Encoding]::new($false))
     }
-    return [pscustomobject]@{ Root = $root; Home = $isolatedHome; CodexHome = $codexHome }
+    return [pscustomobject]@{ Root = $root; Home = $isolatedHome; CodexHome = $codexHome; DoctorRoot = $doctorRoot }
 }
 
 function Get-ManagedSnapshot {
@@ -90,6 +93,7 @@ function Get-ManagedSnapshot {
         config = Get-FileHashOrState -Path (Join-Path $Environment.CodexHome 'config.toml')
         beads_skill = Get-DirectoryHashOrState -Path (Join-Path $Environment.Home '.agents\skills\beads')
         bootstrap_skill = Get-DirectoryHashOrState -Path (Join-Path $Environment.Home '.agents\skills\project-bootstrap')
+        writing_skill = Get-DirectoryHashOrState -Path (Join-Path $Environment.Home '.agents\skills\japanese-technical-writing')
         nudge = Get-FileHashOrState -Path (Join-Path $Environment.CodexHome 'my-codex-rules-beads\beads-stop-nudge.ps1')
     }
 }
@@ -176,13 +180,26 @@ try {
     $afterFirstSetup = Get-ManagedSnapshot -Environment $normalEnvironment
     Assert-Condition ($afterFirstSetup.beads_skill -ne 'missing') '公式Beadsスキルが配置されませんでした。'
     Assert-Condition ($afterFirstSetup.bootstrap_skill -ne 'missing') 'project-bootstrapスキルが配置されませんでした。'
+    Assert-Condition ($afterFirstSetup.writing_skill -ne 'missing') 'japanese-technical-writingスキルが配置されませんでした。'
     Assert-Condition ($afterFirstSetup.nudge -ne 'missing') '記録漏れ通知スクリプトが配置されませんでした。'
     $globalAgentsPath = Join-Path $normalEnvironment.CodexHome 'AGENTS.md'
     $globalAgents = [System.IO.File]::ReadAllText($globalAgentsPath)
-    Assert-Condition ($globalAgents.Contains('憶測で作業を行わず確かな根拠に基づいて作業を実施してください')) '共通ルールがグローバルAGENTS.mdへ導入されませんでした。'
+    Assert-Condition ($globalAgents.Contains('## 事実と根拠を検証する')) '共通ルールがグローバルAGENTS.mdへ導入されませんでした。'
     $statePath = Join-Path $normalEnvironment.CodexHome 'my-codex-rules-beads\state.json'
     $state = [System.IO.File]::ReadAllText($statePath) | ConvertFrom-Json
     Assert-Condition (-not [string]::IsNullOrWhiteSpace([string]$state.global_agents_digest)) 'グローバルAGENTS.mdの管理ハッシュが記録されませんでした。'
+    Assert-Condition (-not [string]::IsNullOrWhiteSpace([string]$state.japanese_technical_writing_digest)) '日本語技術文書スキルの管理ハッシュが記録されませんでした。'
+
+    $configContent = [System.IO.File]::ReadAllText((Join-Path $normalEnvironment.CodexHome 'config.toml'))
+    Assert-Condition ($configContent.Contains('approval_policy = "on-request"')) '未設定のapproval_policyが追加されませんでした。'
+    Assert-Condition ($configContent.Contains('approvals_reviewer = "auto_review"')) '未設定のapprovals_reviewerが追加されませんでした。'
+    $doctorOutput = Invoke-WithEnvironment -Environment $normalEnvironment -Action {
+        $output = @(& codex -C $normalEnvironment.DoctorRoot doctor --json)
+        return $output
+    }
+    Assert-Condition ($doctorOutput.Count -gt 0) '隔離config.tomlのCodex診断がJSONを返しませんでした。'
+    $doctor = ConvertFrom-Json -InputObject ($doctorOutput -join "`n")
+    Assert-Same 'ok' $doctor.checks.'config.load'.status '隔離config.tomlをCodexが正常に読み込めませんでした。'
 
     $hooksPath = Join-Path $normalEnvironment.CodexHome 'hooks.json'
     $hooksObject = [System.IO.File]::ReadAllText($hooksPath) | ConvertFrom-Json
@@ -277,7 +294,9 @@ try {
     Assert-Condition ($remainingCommands -contains 'echo user-added-after-setup') '通常取り消しで導入後の利用者フックが失われました。'
     Assert-Condition (-not ($remainingCommands | Where-Object { $_ -like '*beads-stop-nudge.ps1*' })) '通常取り消し後も独自フックが残っています。'
     $agentsAfterNormalRemoval = [System.IO.File]::ReadAllText((Join-Path $normalEnvironment.CodexHome 'AGENTS.md'))
-    Assert-Condition ($agentsAfterNormalRemoval.Contains('憶測で作業を行わず確かな根拠に基づいて作業を実施してください')) '通常取り消しで共通ルールが失われました。'
+    Assert-Condition ($agentsAfterNormalRemoval.Contains('## 事実と根拠を検証する')) '通常取り消しで共通ルールが失われました。'
+    Assert-Same 'missing' (Get-DirectoryHashOrState -Path (Join-Path $normalEnvironment.Home '.agents\skills\project-bootstrap')) '通常取り消し後もproject-bootstrapスキルが残っています。'
+    Assert-Same 'missing' (Get-DirectoryHashOrState -Path (Join-Path $normalEnvironment.Home '.agents\skills\japanese-technical-writing')) '通常取り消し後も日本語技術文書スキルが残っています。'
 
     $restoreEnvironment = New-IsolatedEnvironment -Name 'restore' -ConfigMissing
     $restoreBefore = Get-ManagedSnapshot -Environment $restoreEnvironment
@@ -290,13 +309,29 @@ try {
     Assert-Same 'missing' $restoreAfter.config '導入前に存在しなかったconfig.tomlが残りました。'
     Assert-Same 'missing' $restoreAfter.beads_skill '公式Beadsスキルが取り消されませんでした。'
     Assert-Same 'missing' $restoreAfter.bootstrap_skill 'project-bootstrapスキルが取り消されませんでした。'
+    Assert-Same 'missing' $restoreAfter.writing_skill 'japanese-technical-writingスキルが取り消されませんでした。'
+
+    Invoke-Setup -Environment $restoreEnvironment
+    $reinstalledAgents = [System.IO.File]::ReadAllText((Join-Path $restoreEnvironment.CodexHome 'AGENTS.md'))
+    Assert-Condition ($reinstalledAgents.Contains('## 事実と根拠を検証する')) '完全復元後に再導入できませんでした。'
+    Invoke-Teardown -Environment $restoreEnvironment -Restore
+    $restoreAfterReinstall = Get-ManagedSnapshot -Environment $restoreEnvironment
+    foreach ($key in $restoreBefore.Keys) {
+        Assert-Same $restoreBefore[$key] $restoreAfterReinstall[$key] "再導入後の完全復元が導入前と一致しません: $key"
+    }
 
     $afterUser = Get-UserSnapshot
     Assert-SnapshotsEqual -Expected $beforeUser -Actual $afterUser -Context '隔離統合検証'
 
     $resolvedTestRoot = [System.IO.Path]::GetFullPath($testRoot)
-    $resolvedExpectedParent = [System.IO.Path]::GetFullPath((Join-Path $repoRoot '.tmp'))
-    Assert-Condition ($resolvedTestRoot.StartsWith($resolvedExpectedParent + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) '一時領域の削除先が不正です。'
+    $resolvedExpectedParent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $resolvedActualParent = [System.IO.Path]::GetDirectoryName($resolvedTestRoot)
+    $resolvedLeaf = [System.IO.Path]::GetFileName($resolvedTestRoot)
+    Assert-Condition ($resolvedActualParent.Equals($resolvedExpectedParent, [System.StringComparison]::OrdinalIgnoreCase)) '一時領域の削除先が不正です。'
+    Assert-Condition ($resolvedLeaf.StartsWith('my-codex-rules-beads-integration-', [System.StringComparison]::Ordinal)) '一時領域の名前が不正です。'
     Remove-Item -LiteralPath $resolvedTestRoot -Recurse -Force
     Write-Host '隔離統合検証は成功しました。'
 }

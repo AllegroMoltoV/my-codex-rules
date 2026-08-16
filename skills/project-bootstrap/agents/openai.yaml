@@ -2,3 +2,6 @@ interface:
   display_name: "プロジェクト初期セットアップ"
   short_description: "Git と Beads を含むプロジェクト作業環境を初期設定"
   default_prompt: "Use $project-bootstrap to initialize this project from its copied .prompts/INIT.md."
+
+policy:
+  allow_implicit_invocation: false

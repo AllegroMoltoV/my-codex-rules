@@ -80,6 +80,20 @@ if ($null -ne $state -and [System.IO.Directory]::Exists($paths.ProjectBootstrapP
     }
 }
 
+if (
+    $null -ne $state -and
+    $null -ne $state.PSObject.Properties['japanese_technical_writing_digest'] -and
+    [System.IO.Directory]::Exists($paths.JapaneseTechnicalWritingPath)
+) {
+    $currentWritingSkillDigest = Get-TreeDigest -Path $paths.JapaneseTechnicalWritingPath
+    if ($currentWritingSkillDigest -eq [string]$state.japanese_technical_writing_digest) {
+        Remove-Item -LiteralPath $paths.JapaneseTechnicalWritingPath -Recurse -Force
+    }
+    else {
+        Write-Warning "利用者の変更を検出したためスキルを削除しません: $($paths.JapaneseTechnicalWritingPath)"
+    }
+}
+
 if ($null -ne $state -and [System.IO.File]::Exists($paths.NudgeScriptPath)) {
     $currentNudgeDigest = Get-FileDigest -Path $paths.NudgeScriptPath
     if ($currentNudgeDigest -eq [string]$state.nudge_digest) {
