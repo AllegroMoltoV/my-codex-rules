@@ -31,6 +31,19 @@ Invoke-TestCase '共通ルールはコマンド承認の判定境界を説明す
     Assert-True ($rules.Contains('サンドボックス')) '許可ルールとサンドボックスの違いが説明されていません。'
 }
 
+Invoke-TestCase '共通ルールは実証済みの反復だけをCodex向けに固定化する' {
+    $rules = [System.IO.File]::ReadAllText($rulesPath)
+    Assert-True ($rules.Contains('繰り返しが確定した手順だけを固定化する')) '固定化の原則がありません。'
+    Assert-True ($rules.Contains('過去に同じ手順を実行した記録')) '反復を過去の記録で確認する条件がありません。'
+    Assert-True ($rules.Contains('固定化できる対象を探すための振り返りや棚卸し')) '固定化のための棚卸しが禁止されていません。'
+    Assert-True ($rules.Contains('入力が決まれば出力も決まる部分')) '決定的な部分だけを切り出す条件がありません。'
+    Assert-True ($rules.Contains('スクリプトか 1 つのコマンド')) '判断が残らない手順の置き場所がありません。'
+    Assert-True ($rules.Contains('.agents/skills/<名前>/SKILL.md')) 'Codex用スキルの置き場所がありません。'
+    Assert-True (-not $rules.Contains('.claude/skills/')) 'Claude Code用スキルの置き場所が混入しています。'
+    Assert-True ($rules.Contains('手順の本文を、常時読み込まれる')) '手順本文を常時読み込ませない規則がありません。'
+    Assert-True ($rules.Contains('再現手順の所在')) '永続メモリへ記録する対象が手順本文ではなく所在に限定されていません。'
+}
+
 Invoke-TestCase '日本語技術文書の詳細規則はスキルとして分離される' {
     Assert-PathExists $writingSkillPath
     Assert-PathExists $writingSkillMetadataPath
