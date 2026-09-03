@@ -13,7 +13,7 @@ Codex は共通の指示を `$CODEX_HOME/AGENTS.md`、再利用可能な手順�
 1. 本リポジトリを clone する
 2. `codex`、`bd`、`jq` が使えることを確認する
 3. `$CODEX_HOME` に非空の `AGENTS.override.md` がないことを確認する
-4. clone したディレクトリで `scripts/setup-beads.ps1` を実行する
+4. clone したディレクトリで、OS に合うセットアップを実行する
 5. Codex で `/hooks` を開き、追加されたフックを確認して信頼する
 6. Codex を再起動する
 
@@ -21,6 +21,14 @@ Codex は共通の指示を `$CODEX_HOME/AGENTS.md`、再利用可能な手順�
 git clone https://github.com/AllegroMoltoV/my-codex-rules.git
 cd my-codex-rules
 pwsh -NoProfile -File scripts/setup-beads.ps1
+```
+
+macOS では PowerShell を追加せず、POSIX シェル版を使います。共通ルールと 2 つのスキルはリポジトリへのシンボリックリンクになるため、`git pull` した内容がそのまま反映されます。
+
+```bash
+git clone https://github.com/AllegroMoltoV/my-codex-rules.git
+cd my-codex-rules
+bash scripts/setup-beads.sh
 ```
 
 セットアップは、共通ルール、2 つのスキル、Auto-review、Beads の Codex 統合、記録漏れ通知フックをグローバル領域へ導入します。既存の Codex 設定は先にバックアップします。`bd` と `jq` は導入しません。見つからない場合は変更前に中止します。
@@ -49,6 +57,8 @@ pwsh -NoProfile -File scripts/setup-beads.ps1
 | `skills/project-bootstrap/` | INIT から呼び出すプロジェクト初期セットアップスキル |
 | `skills/japanese-technical-writing/` | README、設計書、報告書などの日本語技術文書を作成、改稿するスキル |
 | `scripts/setup-beads.ps1` | 共通ルール、スキル、Beads 統合、通知フックの導入 |
+| `scripts/setup-beads.sh` | macOS 向けの同等セットアップ。ルールとスキルはシンボリックリンクで配置 |
+| `scripts/beads-stop-nudge.sh` | macOS 向けの記録漏れ通知フック |
 | `scripts/teardown-beads.ps1` | 管理要素の削除または導入前バックアップの復元 |
 | `scripts/verify-beads.ps1` | 一時的な利用者領域を使う隔離検証 |
 | `exclude` | 対象プロジェクトの `.git/info/exclude` へ追加する設定 |
@@ -75,7 +85,7 @@ pwsh -NoProfile -File scripts/teardown-beads.ps1 -Restore
 
 **配布用 INIT の正本はひとつです。** Git 管理下の `.prompts/INIT.md` だけを更新します。計画、調査報告、実行ログなどの作業資料は `.appendix` または `.logs` に置き、公開用の `.prompts` 配下へ混在させません。
 
-**現在は Windows と PowerShell 7 以降に対応します。** セットアップスクリプトは `codex`、`bd`、`jq` の存在と版表示を確認します。
+**Windows は PowerShell 7 以降、macOS は POSIX シェルに対応します。** セットアップスクリプトは `codex`、`bd`、`jq` の存在を確認します。
 
 ## 開発時の検証
 

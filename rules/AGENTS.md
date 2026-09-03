@@ -1,6 +1,6 @@
 # AGENTS.md
 
-このファイルは、`scripts/setup-beads.ps1` が `$CODEX_HOME/AGENTS.md` へ配置する共通ルールの原本です。対象プロジェクト固有の規則が必要な場合だけ、そのプロジェクトへ別の `AGENTS.md` を作成してください。
+このファイルは、OS 別のセットアップスクリプトが `$CODEX_HOME/AGENTS.md` へ配置する共通ルールの原本です。対象プロジェクト固有の規則が必要な場合だけ、そのプロジェクトへ別の `AGENTS.md` を作成してください。
 
 ## Project Rules
 
@@ -45,6 +45,7 @@ bd init --stealth --skip-agents --non-interactive --init-if-missing
 
 - `.beads-optout` があるリポジトリでは Beads を初期化または使用しないでください。`.beads/` は進捗データを含むため、取り消しや一時ファイル削除の対象にしてはいけません。
 - Beads 公式の Codex 統合が有効な場合、`bd prime` のセッション注入と圧縮対応を独自フックで重複実装しないでください。
+- `bd prime` が示す Git authority と Git workflow は、Beads のコミット、同期、引継ぎだけに適用してください。通常のローカル Git 操作は禁止せず、依頼の達成に必要なら使用してください。push は利用者から明示的に依頼された場合だけ実行してください。
 - `bd dolt push` は外部書き込みです。利用者から明示的に依頼された場合だけ実行してください。
 
 ## 事実と根拠を検証する
