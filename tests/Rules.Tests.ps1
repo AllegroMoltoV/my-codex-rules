@@ -44,6 +44,19 @@ Invoke-TestCase '共通ルールは実証済みの反復だけをCodex向けに�
     Assert-True ($rules.Contains('再現手順の所在')) '永続メモリへ記録する対象が手順本文ではなく所在に限定されていません。'
 }
 
+Invoke-TestCase '共通ルールはBeadsの記録を現在状態のスナップショットとして保つ' {
+    $rules = [System.IO.File]::ReadAllText($rulesPath)
+    Assert-True ($rules.Contains('課題の notes は履歴の置き場所ではなく')) '課題のnotesを現在状態として扱う原則がありません。'
+    Assert-True ($rules.Contains('bd update <id> --notes')) '古いnotesを書き換えるコマンドがありません。'
+    Assert-True ($rules.Contains('残す価値のある経緯')) '残す価値のある経緯の扱いがありません。'
+    Assert-True ($rules.Contains('docs/reports')) '経緯の退避先がありません。'
+    Assert-True ($rules.Contains('bd history')) 'Beads履歴を安全網にしない理由がありません。'
+    Assert-True ($rules.Contains('bd gc')) '履歴を失う操作としてbd gcが明記されていません。'
+    Assert-True ($rules.Contains('bd flatten')) '履歴を失う操作としてbd flattenが明記されていません。'
+    Assert-True ($rules.Contains('bd remember')) '永続メモリの更新規則がありません。'
+    Assert-True ($rules.Contains('`--key`')) '永続メモリを同じキーで上書きする規則がありません。'
+}
+
 Invoke-TestCase '日本語技術文書の詳細規則はスキルとして分離される' {
     Assert-PathExists $writingSkillPath
     Assert-PathExists $writingSkillMetadataPath
