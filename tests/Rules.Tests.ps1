@@ -80,6 +80,15 @@ Invoke-TestCase '共通ルールはTDDを失敗確認からリファクタリン
     Assert-True ($rules.Contains('理由を添えて作業前に利用者へ相談')) 'TDDが適さない場合の相談方法がありません。'
 }
 
+Invoke-TestCase '共通ルールは留保付きの発言を実行指示として扱わない' {
+    $rules = [System.IO.File]::ReadAllText($rulesPath)
+    Assert-True ($rules.Contains('「かもしれない」「かも」「気がする」')) '留保付き発言の具体例がありません。'
+    Assert-True ($rules.Contains('実行の指示ではない')) '留保付き発言を実行指示から区別していません。'
+    Assert-True ($rules.Contains('そのまま着手せず')) '留保付き発言を受けたときに着手を止める規則がありません。'
+    Assert-True ($rules.Contains('確かめた結果か対応案')) '利用者へ返す判断材料がありません。'
+    Assert-True ($rules.Contains('判断を利用者へ返')) '利用者が未決定の判断を委ね直す規則がありません。'
+}
+
 Invoke-TestCase '日本語技術文書の詳細規則はスキルとして分離される' {
     Assert-PathExists $writingSkillPath
     Assert-PathExists $writingSkillMetadataPath
