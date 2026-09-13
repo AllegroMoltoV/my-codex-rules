@@ -44,6 +44,7 @@
 
 ```powershell
 bd init --stealth --skip-agents --non-interactive --init-if-missing
+bd config set no-git-ops false
 ```
 
 - `.beads-optout` があるリポジトリでは Beads を初期化または使用しないでください。`.beads/` は進捗データを含むため、取り消しや一時ファイル削除の対象にしてはいけません。

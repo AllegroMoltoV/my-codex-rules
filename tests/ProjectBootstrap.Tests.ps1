@@ -14,6 +14,12 @@ Invoke-TestCase 'INITは唯一の配布用正本としてproject-bootstrapを呼
     Assert-True (-not [System.IO.File]::Exists($duplicatedAgentsPath)) 'スキル内に共通AGENTS.mdの複製があります。'
 }
 
+Invoke-TestCase 'INITは未発見時に明示起動と導入失敗を区別する' {
+    $init = [System.IO.File]::ReadAllText($initPath)
+    Assert-True ($init.Contains('依頼文に `$project-bootstrap` が直接含まれているか')) 'スキルが見つからない場合に明示起動を確認する案内がありません。'
+    Assert-True ($init.Contains('直接指定されていても見つからない場合だけ')) '明示起動の失敗とグローバルセットアップ未完了を区別していません。'
+}
+
 Invoke-TestCase 'プロジェクト初期化は既存ファイルを上書きしない' {
     Assert-PathExists $bootstrapPath
     $root = New-TestDirectory
@@ -164,6 +170,6 @@ Invoke-TestCase 'READMEは通常利用を二段階で説明する' {
     Assert-True ($readme.Contains('フェーズ 2: プロジェクトのセットアップ')) 'プロジェクト初期設定のフェーズがありません。'
     Assert-True ($readme.Contains('scripts/setup-beads.ps1')) 'グローバル導入コマンドがありません。'
     Assert-True ($readme.Contains('.prompts/INIT.md')) 'INITのコピー元がありません。'
-    Assert-True ($readme.Contains('`.prompts/INIT.md` を実行してください')) 'INITの実行依頼がありません。'
+    Assert-True ($readme.Contains('`$project-bootstrap を使って .prompts/INIT.md を実行してください`')) '利用者の依頼文でproject-bootstrapを明示起動していません。'
     Assert-True (-not $readme.Contains('scripts/bootstrap.ps1 -TargetPath')) '内部bootstrapの直接実行が通常導線に残っています。'
 }

@@ -143,6 +143,10 @@ if (-not $NoBeads -and -not [System.IO.File]::Exists($optOutPath)) {
         if ($LASTEXITCODE -ne 0) {
             throw 'Beadsの初期化に失敗しました。'
         }
+        & $BdCommand config set no-git-ops false
+        if ($LASTEXITCODE -ne 0) {
+            throw 'BeadsのGit操作制限を解除できません。'
+        }
     }
     finally {
         Set-Location -LiteralPath $originalLocation
