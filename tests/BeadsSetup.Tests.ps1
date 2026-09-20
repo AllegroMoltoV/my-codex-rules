@@ -56,8 +56,8 @@ Invoke-TestCase '非空のグローバルoverrideを変更前に拒否する' {
         $agentsBefore = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($agentsPath))
         $configBefore = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($configPath))
 
-        $fakeCommand = Join-Path $root 'fake-command.cmd'
-        [System.IO.File]::WriteAllText($fakeCommand, "@echo fake 1.0`r`n@exit /b 0`r`n", [System.Text.Encoding]::ASCII)
+        $fakeCommand = Join-Path $root 'fake-command.ps1'
+        [System.IO.File]::WriteAllText($fakeCommand, "Write-Output 'fake 1.0'`nexit 0`n", [System.Text.Encoding]::ASCII)
         $message = $null
         try {
             & $setupPath -HomePath $root -CodexHome $codexHome -BdCommand $fakeCommand -JqCommand $fakeCommand -CodexCommand $fakeCommand
@@ -87,8 +87,8 @@ Invoke-TestCase '0バイトのグローバルoverrideはセットアップを妨
         $codexHome = Join-Path $root 'codex-home'
         [System.IO.Directory]::CreateDirectory($codexHome) | Out-Null
         [System.IO.File]::WriteAllBytes((Join-Path $codexHome 'AGENTS.override.md'), [byte[]]@())
-        $fakeCommand = Join-Path $root 'fake-command.cmd'
-        [System.IO.File]::WriteAllText($fakeCommand, "@echo fake 1.0`r`n@exit /b 0`r`n", [System.Text.Encoding]::ASCII)
+        $fakeCommand = Join-Path $root 'fake-command.ps1'
+        [System.IO.File]::WriteAllText($fakeCommand, "Write-Output 'fake 1.0'`nexit 0`n", [System.Text.Encoding]::ASCII)
 
         & $setupPath -HomePath $root -CodexHome $codexHome -BdCommand $fakeCommand -JqCommand $fakeCommand -CodexCommand $fakeCommand
 
@@ -260,8 +260,10 @@ Invoke-TestCase '更新再実行の失敗は開始直前の管理状態へ戻す
     try {
         $codexHome = Join-Path $root 'codex-home'
         [System.IO.Directory]::CreateDirectory($codexHome) | Out-Null
-        $fakeCommand = Join-Path $root 'fake-command.cmd'
-        [System.IO.File]::WriteAllText($fakeCommand, "@echo fake 1.0`r`n@exit /b 0`r`n", [System.Text.Encoding]::ASCII)
+        $fakeCommand = Join-Path $root 'fake-command.ps1'
+        [System.IO.File]::WriteAllText($fakeCommand, "Write-Output 'fake 1.0'`nexit 0`n", [System.Text.Encoding]::ASCII)
+        $localPath = Join-Path $codexHome 'AGENTS.local.md'
+        [System.IO.File]::WriteAllText($localPath, '初回ローカル原本')
         & $setupPath -HomePath $root -CodexHome $codexHome -BdCommand $fakeCommand -JqCommand $fakeCommand -CodexCommand $fakeCommand
 
         $agentsPath = Join-Path $codexHome 'AGENTS.md'
@@ -273,6 +275,7 @@ Invoke-TestCase '更新再実行の失敗は開始直前の管理状態へ戻す
         $configBefore = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($configPath))
         $hooksBefore = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($hooksPath))
         $stateBefore = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($statePath))
+        [System.IO.File]::WriteAllText($localPath, '更新後のローカル原本')
         $message = $null
 
         try {
@@ -282,6 +285,7 @@ Invoke-TestCase '更新再実行の失敗は開始直前の管理状態へ戻す
             $message = $_.Exception.Message
         }
 
+        Assert-Equal '更新後のローカル原本' ([System.IO.File]::ReadAllText($localPath)) 'ロールバックでローカル原本が変更されました。'
         Assert-True (-not [string]::IsNullOrWhiteSpace($message)) '不正なhooks.jsonで更新再実行が失敗しませんでした。'
         Assert-True ([System.IO.File]::Exists($agentsPath)) '更新失敗後に導入済みAGENTS.mdが失われました。'
         Assert-Equal $agentsBefore ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($agentsPath))) '更新失敗後のAGENTS.mdが開始前と一致しません。'
@@ -304,8 +308,8 @@ Invoke-TestCase '通常取り消し後に変更されたAGENTS.mdを再導入で
     try {
         $codexHome = Join-Path $root 'codex-home'
         [System.IO.Directory]::CreateDirectory($codexHome) | Out-Null
-        $fakeCommand = Join-Path $root 'fake-command.cmd'
-        [System.IO.File]::WriteAllText($fakeCommand, "@echo fake 1.0`r`n@exit /b 0`r`n", [System.Text.Encoding]::ASCII)
+        $fakeCommand = Join-Path $root 'fake-command.ps1'
+        [System.IO.File]::WriteAllText($fakeCommand, "Write-Output 'fake 1.0'`nexit 0`n", [System.Text.Encoding]::ASCII)
         & $setupPath -HomePath $root -CodexHome $codexHome -BdCommand $fakeCommand -JqCommand $fakeCommand -CodexCommand $fakeCommand
         & $teardownPath -HomePath $root -CodexHome $codexHome -BdCommand $fakeCommand
 
@@ -339,12 +343,15 @@ Invoke-TestCase '完全復元後は導入前AGENTS.mdを確認して再導入で
         $agentsPath = Join-Path $codexHome 'AGENTS.md'
         $original = '導入前のAGENTS'
         [System.IO.File]::WriteAllText($agentsPath, $original, [System.Text.UTF8Encoding]::new($false))
-        $fakeCommand = Join-Path $root 'fake-command.cmd'
-        $fakeContent = [string]::Join([Environment]::NewLine, @('@echo fake 1.0', '@exit /b 0', ''))
+        $fakeCommand = Join-Path $root 'fake-command.ps1'
+        $fakeContent = [string]::Join([Environment]::NewLine, @("Write-Output 'fake 1.0'", 'exit 0', ''))
         [System.IO.File]::WriteAllText($fakeCommand, $fakeContent, [System.Text.Encoding]::ASCII)
 
+        $localPath = Join-Path $codexHome 'AGENTS.local.md'
+        [System.IO.File]::WriteAllText($localPath, '保持するローカル原本')
         & $setupPath -HomePath $root -CodexHome $codexHome -BdCommand $fakeCommand -JqCommand $fakeCommand -CodexCommand $fakeCommand
         & $teardownPath -Restore -HomePath $root -CodexHome $codexHome -BdCommand $fakeCommand
+        Assert-Equal '保持するローカル原本' ([System.IO.File]::ReadAllText($localPath)) '完全復元でローカル原本が変更されました。'
         Assert-Equal $original ([System.IO.File]::ReadAllText($agentsPath)) '完全復元で導入前AGENTS.mdへ戻りませんでした。'
 
         & $setupPath -HomePath $root -CodexHome $codexHome -BdCommand $fakeCommand -JqCommand $fakeCommand -CodexCommand $fakeCommand
@@ -540,4 +547,69 @@ Invoke-TestCase 'グローバルセットアップは共通ルールを管理対
     Assert-True ($setup.Contains('rules\AGENTS.md')) 'グローバルルールの配布元がありません。'
     Assert-True ($setup.Contains('global_agents_digest')) 'グローバルAGENTS.mdの管理ハッシュがありません。'
     Assert-True ($setup.Contains('japanese_technical_writing_digest')) '日本語技術文書スキルの管理ハッシュがありません。'
+}
+
+Invoke-TestCase '標準セットアップはPC固有ルールを共通ルールの後ろへ追加する' {
+    $root = New-TestDirectory
+    try {
+        $codexHome = Join-Path $root 'codex-home'
+        [System.IO.Directory]::CreateDirectory($codexHome) | Out-Null
+        $localPath = Join-Path $codexHome 'AGENTS.local.md'
+        $localContent = "# AGENTS.local.md`n`nこのPC固有の検証ルール"
+        [System.IO.File]::WriteAllText($localPath, $localContent, [System.Text.UTF8Encoding]::new($false))
+        $fakeCommand = Join-Path $root 'fake-command.ps1'
+        [System.IO.File]::WriteAllText($fakeCommand, "Write-Output 'fake 1.0'`nexit 0`n")
+
+        & $setupPath -HomePath $root -CodexHome $codexHome -BdCommand $fakeCommand -JqCommand $fakeCommand -CodexCommand $fakeCommand
+
+        $actual = [System.IO.File]::ReadAllText((Join-Path $codexHome 'AGENTS.md'))
+        Assert-True ($actual.Contains('このPC固有の検証ルール')) 'PC固有ルールが配置されませんでした。'
+        Assert-True ($actual.IndexOf('## Project Rules') -lt $actual.IndexOf('このPC固有の検証ルール')) 'PC固有ルールが共通ルールの後ろにありません。'
+        Assert-Equal $localContent ([System.IO.File]::ReadAllText($localPath)) 'PC固有の原本が変更されました。'
+    }
+    finally {
+        Remove-Item -LiteralPath $root -Recurse -Force
+    }
+}
+
+Invoke-TestCase '標準セットアップの再実行はPC固有ルールの追加・更新・解除を反映する' {
+    $root = New-TestDirectory
+    try {
+        $codexHome = Join-Path $root 'codex-home'
+        $fakeCommand = Join-Path $root 'fake-command.ps1'
+        [System.IO.File]::WriteAllText($fakeCommand, "Write-Output 'fake 1.0'`nexit 0`n")
+        $setupArguments = @{ HomePath = $root; CodexHome = $codexHome; BdCommand = $fakeCommand; JqCommand = $fakeCommand; CodexCommand = $fakeCommand }
+        & $setupPath @setupArguments
+        $agentsPath = Join-Path $codexHome 'AGENTS.md'
+        $localPath = Join-Path $codexHome 'AGENTS.local.md'
+        $commonBytes = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($rulesPath))
+        Assert-Equal $commonBytes ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($agentsPath))) 'ローカル原本なしの出力が共通原本と異なります。'
+
+        [System.IO.File]::WriteAllText($localPath, "# AGENTS.local.md`r`n`r`n追加したPC固有ルール", [System.Text.UTF8Encoding]::new($true))
+        $originalBytes = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($localPath))
+        & $setupPath @setupArguments
+        $actual = [System.IO.File]::ReadAllText($agentsPath)
+        Assert-True ($actual.EndsWith("追加したPC固有ルール`n")) '追加した原本または末尾改行が反映されませんでした。'
+        Assert-True (-not $actual.Contains("`r") -and -not $actual.Contains('# AGENTS.local.md')) 'BOMまたはCRLF付きの見出しが正規化されませんでした。'
+        Assert-Equal $originalBytes ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($localPath))) '原本のバイト列が変更されました。'
+
+        [System.IO.File]::WriteAllText($localPath, '変更したPC固有ルール')
+        & $setupPath @setupArguments
+        $actual = [System.IO.File]::ReadAllText($agentsPath)
+        Assert-True ($actual.Contains('変更したPC固有ルール') -and -not $actual.Contains('追加したPC固有ルール')) '原本の更新が反映されませんでした。'
+        & $setupPath @setupArguments
+        Assert-Equal $actual ([System.IO.File]::ReadAllText($agentsPath)) '再実行で内容が重複しました。'
+
+        [System.IO.File]::WriteAllText($localPath, '')
+        & $setupPath @setupArguments
+        Assert-Equal $commonBytes ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($agentsPath))) '空の原本でPC固有ルールが解除されませんでした。'
+        [System.IO.File]::WriteAllText($localPath, '再追加したPC固有ルール')
+        & $setupPath @setupArguments
+        Remove-Item -LiteralPath $localPath
+        & $setupPath @setupArguments
+        Assert-Equal $commonBytes ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($agentsPath))) '原本削除後もPC固有ルールが残っています。'
+    }
+    finally {
+        Remove-Item -LiteralPath $root -Recurse -Force
+    }
 }

@@ -48,6 +48,7 @@ function Get-DirectoryHashOrState {
 function Get-UserSnapshot {
     return [ordered]@{
         agents = Get-FileHashOrState -Path (Join-Path $actualCodexHome 'AGENTS.md')
+        local_agents = Get-FileHashOrState -Path (Join-Path $actualCodexHome 'AGENTS.local.md')
         hooks = Get-FileHashOrState -Path (Join-Path $actualCodexHome 'hooks.json')
         config = Get-FileHashOrState -Path (Join-Path $actualCodexHome 'config.toml')
         beads_skill = Get-DirectoryHashOrState -Path (Join-Path $actualHome '.agents\skills\beads')
@@ -77,6 +78,7 @@ function New-IsolatedEnvironment {
     [System.IO.Directory]::CreateDirectory($codexHome) | Out-Null
     [System.IO.Directory]::CreateDirectory((Join-Path $doctorRoot '.git')) | Out-Null
     [System.IO.File]::WriteAllBytes((Join-Path $codexHome 'AGENTS.md'), [byte[]](0xEF, 0xBB, 0xBF, 0x70, 0x72, 0x65, 0x73, 0x65, 0x72, 0x76, 0x65, 0x0D, 0x0A))
+    [System.IO.File]::WriteAllText((Join-Path $codexHome 'AGENTS.local.md'), "# AGENTS.local.md`n`n隔離環境のPC固有ルール`n", [System.Text.UTF8Encoding]::new($false))
     $hooks = '{"description":"preserve","hooks":{"Stop":[{"hooks":[{"type":"command","command":"echo preserve-this-hook"}]}]}}'
     [System.IO.File]::WriteAllText((Join-Path $codexHome 'hooks.json'), $hooks, [System.Text.UTF8Encoding]::new($false))
     if (-not $ConfigMissing) {
@@ -89,6 +91,7 @@ function Get-ManagedSnapshot {
     param($Environment)
     return [ordered]@{
         agents = Get-FileHashOrState -Path (Join-Path $Environment.CodexHome 'AGENTS.md')
+        local_agents = Get-FileHashOrState -Path (Join-Path $Environment.CodexHome 'AGENTS.local.md')
         hooks = Get-FileHashOrState -Path (Join-Path $Environment.CodexHome 'hooks.json')
         config = Get-FileHashOrState -Path (Join-Path $Environment.CodexHome 'config.toml')
         beads_skill = Get-DirectoryHashOrState -Path (Join-Path $Environment.Home '.agents\skills\beads')
@@ -184,7 +187,8 @@ try {
     Assert-Condition ($afterFirstSetup.nudge -ne 'missing') '記録漏れ通知スクリプトが配置されませんでした。'
     $globalAgentsPath = Join-Path $normalEnvironment.CodexHome 'AGENTS.md'
     $globalAgents = [System.IO.File]::ReadAllText($globalAgentsPath)
-    Assert-Condition ($globalAgents.Contains('## 事実と根拠を検証する')) '共通ルールがグローバルAGENTS.mdへ導入されませんでした。'
+    Assert-Condition ($globalAgents.Contains('## 事実確認と網羅的な調査')) '共通ルールがグローバルAGENTS.mdへ導入されませんでした。'
+    Assert-Condition ($globalAgents.Contains('隔離環境のPC固有ルール')) '標準セットアップでPC固有ルールが配置されませんでした。'
     $statePath = Join-Path $normalEnvironment.CodexHome 'my-codex-rules-beads\state.json'
     $state = [System.IO.File]::ReadAllText($statePath) | ConvertFrom-Json
     Assert-Condition (-not [string]::IsNullOrWhiteSpace([string]$state.global_agents_digest)) 'グローバルAGENTS.mdの管理ハッシュが記録されませんでした。'
@@ -294,7 +298,7 @@ try {
     Assert-Condition ($remainingCommands -contains 'echo user-added-after-setup') '通常取り消しで導入後の利用者フックが失われました。'
     Assert-Condition (-not ($remainingCommands | Where-Object { $_ -like '*beads-stop-nudge.ps1*' })) '通常取り消し後も独自フックが残っています。'
     $agentsAfterNormalRemoval = [System.IO.File]::ReadAllText((Join-Path $normalEnvironment.CodexHome 'AGENTS.md'))
-    Assert-Condition ($agentsAfterNormalRemoval.Contains('## 事実と根拠を検証する')) '通常取り消しで共通ルールが失われました。'
+    Assert-Condition ($agentsAfterNormalRemoval.Contains('## 事実確認と網羅的な調査')) '通常取り消しで共通ルールが失われました。'
     Assert-Same 'missing' (Get-DirectoryHashOrState -Path (Join-Path $normalEnvironment.Home '.agents\skills\project-bootstrap')) '通常取り消し後もproject-bootstrapスキルが残っています。'
     Assert-Same 'missing' (Get-DirectoryHashOrState -Path (Join-Path $normalEnvironment.Home '.agents\skills\japanese-technical-writing')) '通常取り消し後も日本語技術文書スキルが残っています。'
 
@@ -304,6 +308,7 @@ try {
     [System.IO.File]::AppendAllText((Join-Path $restoreEnvironment.CodexHome 'AGENTS.md'), 'user change after setup')
     Invoke-Teardown -Environment $restoreEnvironment -Restore
     $restoreAfter = Get-ManagedSnapshot -Environment $restoreEnvironment
+    Assert-Same $restoreBefore.local_agents $restoreAfter.local_agents '完全復元でPC固有の原本が変わりました。'
     Assert-Same $restoreBefore.agents $restoreAfter.agents 'AGENTS.mdがバイト単位で復元されませんでした。'
     Assert-Same $restoreBefore.hooks $restoreAfter.hooks 'hooks.jsonがバイト単位で復元されませんでした。'
     Assert-Same 'missing' $restoreAfter.config '導入前に存在しなかったconfig.tomlが残りました。'
@@ -313,7 +318,7 @@ try {
 
     Invoke-Setup -Environment $restoreEnvironment
     $reinstalledAgents = [System.IO.File]::ReadAllText((Join-Path $restoreEnvironment.CodexHome 'AGENTS.md'))
-    Assert-Condition ($reinstalledAgents.Contains('## 事実と根拠を検証する')) '完全復元後に再導入できませんでした。'
+    Assert-Condition ($reinstalledAgents.Contains('## 事実確認と網羅的な調査')) '完全復元後に再導入できませんでした。'
     Invoke-Teardown -Environment $restoreEnvironment -Restore
     $restoreAfterReinstall = Get-ManagedSnapshot -Environment $restoreEnvironment
     foreach ($key in $restoreBefore.Keys) {

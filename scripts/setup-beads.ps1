@@ -193,6 +193,7 @@ foreach ($entry in @(
 
 $paths = Get-BeadsManagedPaths -HomePath $HomePath -CodexHome $CodexHome
 $globalAgentsPath = Join-Path $paths.CodexHome 'AGENTS.md'
+$localAgentsPath = Join-Path $paths.CodexHome 'AGENTS.local.md'
 $globalOverridePath = Join-Path $paths.CodexHome 'AGENTS.override.md'
 if ([System.IO.File]::Exists($globalOverridePath) -and (Get-Item -LiteralPath $globalOverridePath).Length -gt 0) {
     throw "非空のAGENTS.override.mdがあるため変更しません。このファイルが同階層のAGENTS.mdを隠します。内容を統合するか退避してください: $globalOverridePath"
@@ -308,7 +309,7 @@ try {
         $backupManifest = New-BeadsBackup -CodexHome $paths.CodexHome -BackupRoot $backupDirectory
     }
 
-    [System.IO.File]::WriteAllBytes($globalAgentsPath, [System.IO.File]::ReadAllBytes($sourceRulesPath))
+    [System.IO.File]::WriteAllBytes($globalAgentsPath, (Get-CodexRulesBytes -CommonPath $sourceRulesPath -LocalPath $localAgentsPath))
     $approvalDefaults = Add-CodexApprovalDefaults -ConfigPath (Join-Path $paths.CodexHome 'config.toml')
     if ($approvalDefaults.ApprovalPolicyExisted -and -not $approvalDefaults.ApprovalPolicyMatchesDefault) {
         Write-Warning '既存のapproval_policyを保持しました。on-requestではないためAuto-reviewが有効にならない可能性があります。'

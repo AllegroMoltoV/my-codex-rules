@@ -87,8 +87,8 @@ Invoke-TestCase 'Beads初期化前にローカル役割と除外設定を補う'
     Assert-PathExists $bootstrapPath
     $root = New-TestDirectory
     try {
-        $fakeBd = Join-Path $root 'fake-bd.cmd'
-        [System.IO.File]::WriteAllText($fakeBd, "@exit /b 0`r`n", [System.Text.Encoding]::ASCII)
+        $fakeBd = Join-Path $root 'fake-bd.ps1'
+        [System.IO.File]::WriteAllText($fakeBd, "exit 0`n", [System.Text.Encoding]::ASCII)
 
         & $bootstrapPath -TargetPath $root -BdCommand $fakeBd
 
