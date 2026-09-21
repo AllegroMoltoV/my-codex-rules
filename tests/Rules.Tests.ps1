@@ -64,6 +64,27 @@ Invoke-TestCase '共通ルールは留保付きの発言を実行指示として
     Assert-True ($rules.Contains('判断を利用者へ返')) '利用者が未決定の判断を委ね直す規則がありません。'
 }
 
+Invoke-TestCase '共通ルールは疑問の形を全出力から除く' {
+    $rules = [System.IO.File]::ReadAllText($rulesPath)
+    Assert-True ($rules.Contains('## 疑問の形を文に残さない')) '疑問節を除く原則がありません。'
+    Assert-True ($rules.Contains('用言に「か」が付く節')) '禁止対象が用言に続く「か」だと明記されていません。'
+    Assert-True ($rules.Contains('成否、要否、可否、有無、当否、適否、原因、方法、範囲、状況')) '疑問節の言い換えに使う名詞がありません。'
+    Assert-True ($rules.Contains('体言を並べる「A か B」')) '体言を並べる例外がありません。'
+    Assert-True ($rules.Contains('利用者へ判断を求める問いかけの文末')) '利用者への問いかけの例外がありません。'
+    foreach ($phrase in @('必要があるか確認', '記録がないか検索', '必要かどうかです', '修正するか削除', 'テストを先に書くかは', '正しいのかを毎回推論', '名詞へ畳むか', '助詞へ直すか', '文を分けるか')) {
+        Assert-True (-not $rules.Contains($phrase)) "新しい原則に反する既存表現が残っています: $phrase"
+    }
+}
+
+Invoke-TestCase '共通ルールは「は」を主題として検査する' {
+    $rules = [System.IO.File]::ReadAllText($rulesPath)
+    Assert-True ($rules.Contains('## 「は」は主題を示す助詞として使う')) '「は」を主題として扱う原則がありません。'
+    Assert-True ($rules.Contains('述語とその主語を特定')) '述語と主語を特定する検査手順がありません。'
+    Assert-True ($rules.Contains('場所や範囲なら「では」、対象なら「には」、条件なら「の場合は」、所属や所有なら「の」')) '主題と述語の関係に応じた助詞の選択基準がありません。'
+    Assert-True ($rules.Contains('目的語を主題に立てた文')) '目的語を主題に立てる例外がありません。'
+    Assert-True ($rules.Contains('対比する「A は残し、B は削る」')) '対比で「は」を使う例外がありません。'
+}
+
 Invoke-TestCase '日本語技術文書の詳細規則はスキルとして分離される' {
     Assert-PathExists $writingSkillPath
     Assert-PathExists $writingSkillMetadataPath
@@ -75,5 +96,7 @@ Invoke-TestCase '日本語技術文書の詳細規則はスキルとして分離
     Assert-True ($rules.Contains('不自然な半角スペース')) '全出力に必要な空白規則が共通ルールから失われています。'
     Assert-True ($skill.Contains('日本語の技術文書')) '日本語技術文書を対象とする説明がありません。'
     Assert-True ($skill.Contains('全角かっこ')) '移動対象の表記規則がスキルにありません。'
+    Assert-True ($skill.Contains('用言に続く「か」の疑問節')) '疑問節の仕上げ確認がスキルにありません。'
+    Assert-True ($skill.Contains('主題と述語の主語')) '「は」の仕上げ確認がスキルにありません。'
     Assert-True ($metadata.Contains('$japanese-technical-writing')) '既定プロンプトにスキル名がありません。'
 }
