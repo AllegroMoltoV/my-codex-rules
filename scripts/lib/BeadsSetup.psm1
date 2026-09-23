@@ -630,6 +630,7 @@ function Get-BeadsManagedPaths {
         BackupRoot = Join-Path $runtimeRoot 'backup'
         ProjectBootstrapPath = Join-Path $resolvedHome '.agents\skills\project-bootstrap'
         JapaneseTechnicalWritingPath = Join-Path $resolvedHome '.agents\skills\japanese-technical-writing'
+        TechnicalBlogWritingPath = Join-Path $resolvedHome '.agents\skills\technical-blog-writing'
         BeadsSkillPath = Join-Path $resolvedHome '.agents\skills\beads'
     }
 }

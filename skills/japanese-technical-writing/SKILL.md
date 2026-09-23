@@ -1,6 +1,6 @@
 ---
 name: japanese-technical-writing
-description: Write or revise Japanese technical documentation with consistent structure, terminology, punctuation, spacing, and plain formal prose. Use for README files, design documents, plans, reports, runbooks, specifications, and other Japanese technical markdown. Do not use for chat replies, UI text, ticket drafts, or source-code identifiers unless the user explicitly requests document-style editing.
+description: Write or revise Japanese technical documentation, including technical blog posts, with consistent structure, terminology, punctuation, spacing, and plain formal prose. Use for README files, design documents, plans, reports, runbooks, specifications, and Japanese technical markdown. Do not use for chat replies, UI text, ticket drafts, or source-code identifiers unless the user explicitly requests document-style editing.
 ---
 
 # 日本語技術文書
@@ -15,7 +15,7 @@ description: Write or revise Japanese technical documentation with consistent st
 
 背景や目的など抽象度の高い説明から始め、設計、手順、検証結果など具体的な内容へ進める。序論、本論、結論や、背景、提案、検証、考察など、文書の目的に適した一般的な構成を使う。
 
-手順の前には、その操作が必要な理由や目的を短く説明する。見出しと、箇条書きや表で項目名として使うラベルは文にせず、環境変数の設定のように内容を具体的に表す名前を付ける。疑問形は使わず、修正すべき理由、問題点、考えられる最適な手法、のような体言止めにする。技術文書で一般的なラベルや、検証結果: 状態の更新のようにラベルと内容をコロンでつなぐ形も使える。図が文章より関係を明確にする場合は Mermaid を使う。
+手順の前には、その操作が必要な理由や目的を短く説明する。見出しと、箇条書きや表で項目名として使うラベルは文にせず、環境変数の設定のように内容を具体的に表す名前を付ける。疑問節を体言止めにしたラベルも避け、「調査対象」などの名詞にする。修正すべき理由、問題点、考えられる最適な手法、のような体言止めや、検証結果: 状態の更新のようなラベルも使える。図が文章より関係を明確にする場合は Mermaid を使う。
 
 README には、プロジェクトの目的、背景、内容物、使い方を記載する。初見の読者が作業を開始できる情報をそろえ、末尾に版ごとの更新情報を置く。
 
@@ -23,12 +23,16 @@ README には、プロジェクトの目的、背景、内容物、使い方を�
 
 - 日本語で、技術文書に適したフォーマル寄りの文体を使う。
 - 専門用語は、対象読者が理解できない可能性がある場合に意味を補う。
+- 説明が必要な用語は初出時に説明し、説明前に使わない。
 - 衒学的な表現、冗長な受け身、英語の直訳調を避け、平易で短い文にする。
 - 一文に複数の主張を詰め込まず、長くなる場合は文を分ける。
 - 箇条書きは並列な項目にだけ使い、通常の説明は文として完結させる。
 - 助詞を適切に使い、主題、主語、述語の関係を明確にする。特に「は」の直前の語と、述語が受ける主語を区別する。
 - 整理する、寄せる、効く、包括的に、一気通貫で、ポイントは、要点は、など意味が広い表現を避け、実際の操作や結果を書く。
 - 同じ対象には同じ用語を使い、理由なく言い換えない。
+- 一般的でない直訳語や造語を避け、既存の平易な表現を使う。悪い例: `合成環境`。良い例: `検証用に作った環境`。
+- 同格の名詞を並べる必要がある場合は中点で区切る。悪い例: `設計、実装、検証の担当者`。良い例: `設計・実装・検証の担当者`。自然な一語や文に直せる場合は列挙自体を避ける。
+- 読者が想定しない固有のケースを先回りで否定するなど、理解に必要な情報が増えない文を削る。
 - endpoint や agent のように一般的な日本語表現がある語は、エンドポイント、エージェントのように書く。カタカナ語も必要な範囲に限る。
 
 ## 表記を統一する
@@ -41,6 +45,11 @@ README には、プロジェクトの目的、背景、内容物、使い方を�
 - 日本語文章中ではダブルクォーテーションを使わない。コード、設定値、識別子の引用はコード書式を使う。
 - ひとつひとつ、一発逆転などの日本語の語を算用数字へ置き換えない。数量や順序のように異なる数へ置き換えられるものは算用数字を使う。
 - 4 桁以上の数にはコンマを付ける。
+- 数値には単位を添える。割合の比較では、削減率より比較対象に対する残存割合を優先する。例: `48% 削減`より`従来の 52% の時間`。
+
+## 根拠を示す
+
+根拠を示すときは、読み手が内容を確認できる抜粋を載せる。機密情報・プロジェクト固有情報のマスク以外の理由で内容を変更したり、結論に都合よく切り取ったりしない。途中を省いた場合は`(中略)`などで明示する。
 
 ## 仕上げを確認する
 

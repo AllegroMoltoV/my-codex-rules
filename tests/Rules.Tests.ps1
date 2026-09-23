@@ -2,6 +2,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $rulesPath = Join-Path $repoRoot 'rules\AGENTS.md'
 $writingSkillPath = Join-Path $repoRoot 'skills\japanese-technical-writing\SKILL.md'
 $writingSkillMetadataPath = Join-Path $repoRoot 'skills\japanese-technical-writing\agents\openai.yaml'
+$blogSkillPath = Join-Path $repoRoot 'skills\technical-blog-writing\SKILL.md'
 
 Invoke-TestCase '共通ルールはCodexの既定上限以下である' {
     Assert-PathExists $rulesPath
@@ -99,4 +100,13 @@ Invoke-TestCase '日本語技術文書の詳細規則はスキルとして分離
     Assert-True ($skill.Contains('用言に続く「か」の疑問節')) '疑問節の仕上げ確認がスキルにありません。'
     Assert-True ($skill.Contains('主題と述語の主語')) '「は」の仕上げ確認がスキルにありません。'
     Assert-True ($metadata.Contains('$japanese-technical-writing')) '既定プロンプトにスキル名がありません。'
+}
+
+Invoke-TestCase '技術ブログ専用スキルは一般文書と区別して呼び出される' {
+    Assert-PathExists $blogSkillPath
+    $rules = [System.IO.File]::ReadAllText($rulesPath)
+    $blog = [System.IO.File]::ReadAllText($blogSkillPath)
+    Assert-True ($rules.Contains('`technical-blog-writing` スキルを使ってください')) '共通ルールにブログスキルの呼出し条件がありません。'
+    Assert-True ($blog.Contains('Do not use for README files, design documents, plans, reports')) '一般文書の除外がdescriptionにありません。'
+    Assert-True ($blog.Contains('`japanese-technical-writing`スキルも併用')) '日本語記法の参照先がありません。'
 }

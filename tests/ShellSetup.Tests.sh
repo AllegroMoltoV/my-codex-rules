@@ -41,6 +41,7 @@ chmod +x "${STUB_BIN}/codex" "${STUB_BIN}/bd"
 export PATH="${STUB_BIN}:${PATH}"
 
 bash "${REPO_ROOT}/scripts/setup-beads.sh" >/dev/null
+cmp "${REPO_ROOT}/skills/technical-blog-writing/SKILL.md" "${HOME}/.agents/skills/technical-blog-writing/SKILL.md"
 
 expected_session_command="${REPO_ROOT}/scripts/beads-codex-hook.sh SessionStart"
 actual_session_command="$(jq -r '.hooks.SessionStart[0].hooks[0].command' "${CODEX_HOME}/hooks.json")"

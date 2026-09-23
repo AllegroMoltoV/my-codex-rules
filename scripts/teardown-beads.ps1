@@ -94,6 +94,20 @@ if (
     }
 }
 
+if (
+    $null -ne $state -and
+    $null -ne $state.PSObject.Properties['technical_blog_writing_digest'] -and
+    [System.IO.Directory]::Exists($paths.TechnicalBlogWritingPath)
+) {
+    $currentBlogSkillDigest = Get-TreeDigest -Path $paths.TechnicalBlogWritingPath
+    if ($currentBlogSkillDigest -eq [string]$state.technical_blog_writing_digest) {
+        Remove-Item -LiteralPath $paths.TechnicalBlogWritingPath -Recurse -Force
+    }
+    else {
+        Write-Warning "利用者の変更を検出したためスキルを削除しません: $($paths.TechnicalBlogWritingPath)"
+    }
+}
+
 if ($null -ne $state -and [System.IO.File]::Exists($paths.NudgeScriptPath)) {
     $currentNudgeDigest = Get-FileDigest -Path $paths.NudgeScriptPath
     if ($currentNudgeDigest -eq [string]$state.nudge_digest) {

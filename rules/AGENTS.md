@@ -19,6 +19,7 @@
 - `git -C` を使わず、コマンドの作業ディレクトリを指定してください。
 - 共有価値がある調査結果と文書は `docs/reports`、`docs/logs` と `docs/INDEX.md` に記録してください。個人用または公開前の資料は `.appendix`、一時ログは `.logs` に置いてください。
 - README、設計書、計画、報告書などの日本語技術文書を作成または改稿するときは、`japanese-technical-writing` スキルを使ってください。
+- 技術ブログの執筆戦略、初稿、改稿、校正では、`technical-blog-writing` スキルを使ってください。日本語の記事では`japanese-technical-writing`スキルも併用してください。
 
 ## コマンドと承認
 

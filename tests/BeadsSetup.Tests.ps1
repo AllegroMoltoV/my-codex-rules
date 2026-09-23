@@ -294,6 +294,7 @@ Invoke-TestCase '更新再実行の失敗は開始直前の管理状態へ戻す
         Assert-Equal $stateBefore ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($statePath))) '更新失敗後のstate.jsonが開始前と一致しません。'
         Assert-True ([System.IO.Directory]::Exists((Join-Path $root '.agents\skills\project-bootstrap'))) '更新失敗後にproject-bootstrapスキルが失われました。'
         Assert-True ([System.IO.Directory]::Exists((Join-Path $root '.agents\skills\japanese-technical-writing'))) '更新失敗後に日本語技術文書スキルが失われました。'
+        Assert-True ([System.IO.Directory]::Exists((Join-Path $root '.agents\skills\technical-blog-writing'))) '更新失敗後に技術ブログ執筆スキルが失われました。'
     }
     finally {
         if (Test-Path -LiteralPath $root) {

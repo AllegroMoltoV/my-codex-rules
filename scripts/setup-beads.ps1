@@ -201,6 +201,7 @@ if ([System.IO.File]::Exists($globalOverridePath) -and (Get-Item -LiteralPath $g
 $sourceRulesPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'rules\AGENTS.md'
 $sourceSkillPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'skills\project-bootstrap'
 $sourceWritingSkillPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'skills\japanese-technical-writing'
+$sourceBlogSkillPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'skills\technical-blog-writing'
 $sourceNudgePath = Join-Path $PSScriptRoot 'beads-stop-nudge.ps1'
 if (-not [System.IO.File]::Exists($sourceRulesPath)) {
     throw "グローバルルールがありません: $sourceRulesPath"
@@ -210,6 +211,9 @@ if (-not [System.IO.Directory]::Exists($sourceSkillPath)) {
 }
 if (-not [System.IO.Directory]::Exists($sourceWritingSkillPath)) {
     throw "japanese-technical-writingスキルがありません: $sourceWritingSkillPath"
+}
+if (-not [System.IO.Directory]::Exists($sourceBlogSkillPath)) {
+    throw "technical-blog-writingスキルがありません: $sourceBlogSkillPath"
 }
 if (-not [System.IO.File]::Exists($sourceNudgePath)) {
     throw "記録漏れ通知スクリプトがありません: $sourceNudgePath"
@@ -279,6 +283,17 @@ if ([System.IO.Directory]::Exists($paths.JapaneseTechnicalWritingPath)) {
     }
 }
 
+$expectedBlogSkillDigest = if (
+    $null -ne $previousState -and
+    $null -ne $previousState.PSObject.Properties['technical_blog_writing_digest']
+) { [string]$previousState.technical_blog_writing_digest } else { $null }
+if ([System.IO.Directory]::Exists($paths.TechnicalBlogWritingPath)) {
+    $existingBlogSkillDigest = Get-TreeDigest -Path $paths.TechnicalBlogWritingPath
+    if ([string]::IsNullOrWhiteSpace($expectedBlogSkillDigest) -or $existingBlogSkillDigest -ne $expectedBlogSkillDigest) {
+        throw "既存のtechnical-blog-writingスキルは管理対象と確認できないため変更しません: $($paths.TechnicalBlogWritingPath)"
+    }
+}
+
 $rollbackRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('my-codex-rules-setup-rollback-' + [guid]::NewGuid().ToString('N'))
 [System.IO.Directory]::CreateDirectory($rollbackRoot) | Out-Null
 $rollbackManifest = New-BeadsBackup -CodexHome $paths.CodexHome -BackupRoot (Join-Path $rollbackRoot 'codex-files')
@@ -287,6 +302,7 @@ $treeSnapshots = @(
     New-TreeSnapshot -Path $paths.BeadsSkillPath -SnapshotRoot $rollbackRoot -Name 'beads-skill'
     New-TreeSnapshot -Path $paths.ProjectBootstrapPath -SnapshotRoot $rollbackRoot -Name 'project-bootstrap'
     New-TreeSnapshot -Path $paths.JapaneseTechnicalWritingPath -SnapshotRoot $rollbackRoot -Name 'japanese-technical-writing'
+    New-TreeSnapshot -Path $paths.TechnicalBlogWritingPath -SnapshotRoot $rollbackRoot -Name 'technical-blog-writing'
 )
 $wasInstalled = (
     $null -ne $previousState -and
@@ -329,6 +345,7 @@ try {
 
     $skillDigest = Copy-OwnedTree -Source $sourceSkillPath -Destination $paths.ProjectBootstrapPath -ExpectedDigest $expectedSkillDigest
     $writingSkillDigest = Copy-OwnedTree -Source $sourceWritingSkillPath -Destination $paths.JapaneseTechnicalWritingPath -ExpectedDigest $expectedWritingSkillDigest
+    $blogSkillDigest = Copy-OwnedTree -Source $sourceBlogSkillPath -Destination $paths.TechnicalBlogWritingPath -ExpectedDigest $expectedBlogSkillDigest
     $state = [pscustomobject]@{
         version = 3
         installed = $true
@@ -341,6 +358,7 @@ try {
         nudge_digest = Get-FileDigest -Path $paths.NudgeScriptPath
         project_bootstrap_digest = $skillDigest
         japanese_technical_writing_digest = $writingSkillDigest
+        technical_blog_writing_digest = $blogSkillDigest
         dependency_versions = $versions
     }
     Write-Utf8JsonFile -Path $paths.StatePath -InputObject $state
@@ -385,7 +403,7 @@ if ([System.IO.Directory]::Exists($rollbackRoot)) {
     Remove-Item -LiteralPath $rollbackRoot -Recurse -Force
 }
 
-Write-Host '共通ルール、2つのスキル、Auto-review、BeadsのCodex統合を設定しました。'
+Write-Host '共通ルール、3つのスキル、Auto-review、BeadsのCodex統合を設定しました。'
 Write-Host "bd: $($versions.bd)"
 Write-Host "jq: $($versions.jq)"
 Write-Host "codex: $($versions.codex)"
