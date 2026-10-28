@@ -11,7 +11,7 @@ Codex は共通の指示を `$CODEX_HOME/AGENTS.md`、再利用可能な手順�
 ### フェーズ 1: グローバルの初回セットアップ
 
 1. 本リポジトリを clone する
-2. `codex`、`bd`、`jq` が使えることを確認する
+2. `codex`、`bd`、`jq`、Python 3.8 以降が使えることを確認する
 3. `$CODEX_HOME` に非空の `AGENTS.override.md` がないことを確認する
 4. clone したディレクトリで、OS に合うセットアップを実行する
 5. Codex で `/hooks` を開き、追加されたフックを確認して信頼する
@@ -31,7 +31,7 @@ cd my-codex-rules
 bash scripts/setup-beads.sh
 ```
 
-セットアップは、共通ルール、3 つのスキル、Auto-review、Beads の Codex 統合、記録漏れ通知フックをグローバル領域へ導入します。既存の Codex 設定は先にバックアップします。`bd` と `jq` は導入しません。見つからない場合は変更前に中止します。
+セットアップは、共通ルール、3 つのスキル、Auto-review、Beads の Codex 統合、規約フック、記録漏れ通知フックをグローバル領域へ導入します。既存の Codex 設定は先にバックアップします。`bd`、`jq`、Python は導入しません。見つからない場合は変更前に中止します。
 
 非空の `$CODEX_HOME/AGENTS.override.md` がある場合、Codex は同じ階層の `AGENTS.md` を読み込みません。セットアップは無効な導入を成功扱いにせず、設定変更前に停止します。override の内容を共通ルールへ統合する、または一時的に退避してから再実行してください。0 バイトの override は Codex が読み飛ばすため停止対象ではありません。
 
@@ -76,10 +76,24 @@ PC 固有ルールを解除する場合は、`AGENTS.local.md` を空にする�
 | `scripts/setup-beads.ps1` | 共通ルール、スキル、Beads 統合、通知フックの導入 |
 | `scripts/setup-beads.sh` | macOS 向けの標準セットアップ。PC 固有ルールの結合にも対応 |
 | `scripts/setup-local-rules.sh` | macOS 標準セットアップから呼ぶルール結合処理 |
+| `scripts/hooks/` | コマンド規約、Markdown 表記の検査と公式 Beads フックの呼出し |
+| `scripts/manage-hooks.py` | 両 OS で共通のフック登録・解除 |
 | `scripts/beads-stop-nudge.sh` | macOS 向けの記録漏れ通知フック |
 | `scripts/teardown-beads.ps1` | 管理要素の削除または導入前バックアップの復元 |
 | `scripts/verify-beads.ps1` | 一時的な利用者領域を使う隔離検証 |
 | `exclude` | 対象プロジェクトの `.git/info/exclude` へ追加する設定 |
+
+## 規約フック
+
+標準セットアップが `PreToolUse` の `Bash` と `PostToolUse` の `apply_patch` に検査を登録します。フックを信頼した新しい Codex セッションから有効です。[Codex のフック仕様](https://learn.chatgpt.com/docs/hooks)
+
+- コマンドガードは、先頭の単純な `git -C` と `cd <dir> &&` を実行前に止め、実行ツールの作業ディレクトリ指定を案内します。文字列引数をコマンドとして扱いません。後続コマンド、コマンド置換、複雑なシェル構文は文章の規則で確認します。
+- Markdown 検査は `docs/`、`rules/`、`skills/` とルートの README、CONTRIBUTING、CHANGELOG、DESIGN、ARCHITECTURE、SPEC、PLAN 系の `.md` を対象にします。`apply_patch` で追加した行と編集後の文書を照合し、本文の全角かっこ、全角コロン、日本語に隣接するダブルクオートを通知します。編集成功結果を維持するため、終了コード 0 と追加コンテキストを返します。
+- コードフェンス、インラインコード、字下げコード、フロントマター、引用ブロック、隠しディレクトリ、作業領域外、対応箇所を一意に特定できない編集は検査しません。`.prompts/` の文案も対象外です。フックの範囲外にある文書とシェル経由の編集にも、適用対象の文章規則は引き続き適用します。
+
+Python の実行ファイル名が異なる場合、macOS では `PYTHON_COMMAND`、PowerShell では `-PythonCommand` で指定できます。未導入の場合は設定変更前に停止します。既存フックを保持し、管理対象だけを更新します。PowerShell 版の通常取り消しでは規約フックの登録を解除し、配置後に変更されていないスクリプトだけを削除します。
+
+Beads の公式フックを呼ぶ子プロセスでは、`BD_NO_GIT_OPS` が未設定の場合だけ `false` を設定します。明示済みの値と公式の出力・終了状態を保持します。公式統合のコンテキスト注入と圧縮対応は再実装しません。この既定値はフックの子プロセスだけに適用し、通常のシェルで実行する `bd` の設定は変更しません。プロジェクトの初期セットアップでは従来どおり `bd config set no-git-ops false` を実行します。コミットと push の承認条件は共通ルールに従います。
 
 ## 補足
 
@@ -107,7 +121,7 @@ PowerShell 版は、導入後に出力の `AGENTS.md` やスキルが直接変�
 
 **このリポジトリも Beads で管理します。** `.beads-optout` は置かず、計画、実行状態、ブロッカーを Beads に記録します。`.beads/` は進捗データを含むため、取り消し処理や一時ファイル削除の対象にしません。
 
-**通常の取り消しでは共通ルールと Codex 設定を残します。** Beads 統合、通知フック、3 つのスキルだけを削除する場合は、次を実行します。
+**通常の取り消しでは共通ルールと Codex 設定を残します。** Beads 統合、規約・通知フック、3 つのスキルだけを削除する場合は、次を実行します。
 
 ```powershell
 pwsh -NoProfile -File scripts/teardown-beads.ps1
@@ -123,7 +137,7 @@ pwsh -NoProfile -File scripts/teardown-beads.ps1 -Restore
 
 `.prompts/DRAFT/` の文案、`.tmp/` の一時ファイル、`.logs/` のログは、各ディレクトリ直下にフラットに置きます。ファイル名の接頭辞は `yyyymmddnn` とし、同じ日付・同じディレクトリ内で `nn` を `01` から順に増やします。
 
-**Windows は PowerShell 7 以降、macOS は POSIX シェルに対応します。** セットアップスクリプトは `codex`、`bd`、`jq` の存在を確認します。
+**Windows は PowerShell 7 以降、macOS は POSIX シェルに対応します。** セットアップスクリプトは `codex`、`bd`、`jq`、Python 3.8 以降の存在を確認します。
 
 ## 開発時の検証
 
@@ -136,6 +150,7 @@ macOS 向けの標準セットアップは次で検証できます。
 
 ```bash
 bash tests/ShellSetup.Tests.sh
+python3 -B -m unittest discover -s tests -p 'test_*.py'
 ```
 
 隔離検証は一時的な `HOME` と `CODEX_HOME` を使い、実際のグローバル環境を変更しません。PowerShell のテストは PowerShell 7 が必要です。検証範囲と読込み方式は [PC 固有ルールの検証記録](docs/reports/2026-09-20-local-rules.md) を参照してください。
@@ -150,6 +165,7 @@ MIT License です。詳細は [LICENSE](LICENSE) を参照してください。
 
 | バージョン | 日付 | 内容 |
 |---|---|---|
+| v1.19.0 | 2026-10-28 | Claude Code 版 v2.22.0〜v2.24.0 を Codex 向けに反映。技術ブログ規則、依頼者の定義、一時制約と優先度の管理を更新。規約フックを両 OS のセットアップへ統合し、公式 Beads フックへ環境変数の既定値を渡す方式へ変更 |
 | v1.18.0 | 2026-09-26 | 文案・一時ファイル・ログのフラット配置と `yyyymmddnn` 接頭辞を追加。作業記憶の保存先を Beads に統一し、ログ保存例も新しい命名規則へ更新 |
 | v1.17.0 | 2026-09-23 | 技術ブログ専用スキルを追加し、日本語技術文書に共通する記法を既存スキルへ統合。共通ルールにはスキルの呼出し条件だけを追加。Windows と macOS のセットアップ、Windows の取り消し・復元処理、関連テストを更新 |
 | v1.16.0 | 2026-09-22 | Claude Code 版 v2.19.0 の日本語出力規則を Codex 向けに反映。用言に続く「か」の疑問節を全出力から除き、成否、要否、可否、有無などの名詞へ言い換える原則を追加。「は」を主題として扱い、述語の主語との関係に応じて助詞または述語を直す検査手順も追加。共通ルール自身の該当表現、日本語技術文書スキル、回帰テストを更新 |

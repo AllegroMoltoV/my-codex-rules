@@ -3,7 +3,8 @@ param(
     [switch]$Restore,
     [string]$HomePath = $(if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }),
     [string]$CodexHome = $(if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HomePath '.codex' }),
-    [string]$BdCommand = 'bd'
+    [string]$BdCommand = 'bd',
+    [string]$PythonCommand = 'python3'
 )
 
 Set-StrictMode -Version Latest
@@ -65,6 +66,12 @@ if ($Restore -and $null -eq $state) {
     throw "復元に必要な状態記録がありません: $($paths.StatePath)"
 }
 
+if (-not (Test-ExternalCommand -Name $PythonCommand)) { throw "依存コマンドが見つかりません: $PythonCommand" }
+$conventionPath = Join-Path $paths.RuntimeRoot 'hooks'
+if ([System.IO.File]::Exists($paths.HooksPath)) {
+    & $PythonCommand (Join-Path $PSScriptRoot 'manage-hooks.py') $paths.HooksPath $conventionPath --remove
+    if ($LASTEXITCODE -ne 0) { throw '規約フックの解除に失敗しました。' }
+}
 Invoke-IsolatedBd -Arguments @('setup', 'codex', '--global', '--remove')
 
 $hookCommand = if ($null -ne $state) { [string]$state.hook_command } else { 'pwsh -NoProfile -File "' + $paths.NudgeScriptPath + '"' }
@@ -116,6 +123,13 @@ if ($null -ne $state -and [System.IO.File]::Exists($paths.NudgeScriptPath)) {
     else {
         Write-Warning "利用者の変更を検出したため通知スクリプトを削除しません: $($paths.NudgeScriptPath)"
     }
+}
+
+if ($null -ne $state -and $null -ne $state.PSObject.Properties['convention_digest'] -and [System.IO.Directory]::Exists($conventionPath)) {
+    if ((Get-TreeDigest -Path $conventionPath) -eq [string]$state.convention_digest) {
+        Remove-Item -LiteralPath $conventionPath -Recurse -Force
+    }
+    else { Write-Warning "変更された規約フックを保持します: $conventionPath" }
 }
 
 if ($Restore) {

@@ -99,6 +99,7 @@ function Get-ManagedSnapshot {
         bootstrap_skill = Get-DirectoryHashOrState -Path (Join-Path $Environment.Home '.agents\skills\project-bootstrap')
         writing_skill = Get-DirectoryHashOrState -Path (Join-Path $Environment.Home '.agents\skills\japanese-technical-writing')
         blog_skill = Get-DirectoryHashOrState -Path (Join-Path $Environment.Home '.agents\skills\technical-blog-writing')
+        convention = Get-DirectoryHashOrState -Path (Join-Path $Environment.CodexHome 'my-codex-rules-beads\hooks')
         nudge = Get-FileHashOrState -Path (Join-Path $Environment.CodexHome 'my-codex-rules-beads\beads-stop-nudge.ps1')
     }
 }
@@ -222,7 +223,7 @@ try {
     )
     Assert-Same 1 (@($allCommands | Where-Object { $_ -eq 'echo preserve-this-hook' }).Count) '既存フックが保持されませんでした。'
     Assert-Same 1 (@($allCommands | Where-Object { $_ -like '*beads-stop-nudge.ps1*' }).Count) '独自Stopフックが重複または欠落しています。'
-    Assert-Condition ($allCommands -contains 'bd codex-hook SessionStart') '公式SessionStartフックがありません。'
+    Assert-Condition (@($hooksObject.hooks.SessionStart.hooks | Where-Object { $_.statusMessage -eq 'my-codex-rules: SessionStart' }).Count -eq 1) '公式SessionStartフックがありません。'
     Assert-Condition (([System.IO.File]::ReadAllText((Join-Path $normalEnvironment.Home '.config\bd\config.yaml'))).Contains('disabled: true')) '隔離環境の匿名利用統計が停止されませんでした。'
 
     Invoke-Setup -Environment $normalEnvironment
@@ -317,6 +318,7 @@ try {
     Assert-Same $restoreBefore.agents $restoreAfter.agents 'AGENTS.mdがバイト単位で復元されませんでした。'
     Assert-Same $restoreBefore.hooks $restoreAfter.hooks 'hooks.jsonがバイト単位で復元されませんでした。'
     Assert-Same 'missing' $restoreAfter.config '導入前に存在しなかったconfig.tomlが残りました。'
+    Assert-Same 'missing' $restoreAfter.convention '規約フックのファイルが取り消されませんでした。'
     Assert-Same 'missing' $restoreAfter.beads_skill '公式Beadsスキルが取り消されませんでした。'
     Assert-Same 'missing' $restoreAfter.bootstrap_skill 'project-bootstrapスキルが取り消されませんでした。'
     Assert-Same 'missing' $restoreAfter.writing_skill 'japanese-technical-writingスキルが取り消されませんでした。'

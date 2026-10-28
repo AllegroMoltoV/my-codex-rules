@@ -43,7 +43,7 @@ export PATH="${STUB_BIN}:${PATH}"
 bash "${REPO_ROOT}/scripts/setup-beads.sh" >/dev/null
 cmp "${REPO_ROOT}/skills/technical-blog-writing/SKILL.md" "${HOME}/.agents/skills/technical-blog-writing/SKILL.md"
 
-expected_session_command="${REPO_ROOT}/scripts/beads-codex-hook.sh SessionStart"
+expected_session_command="$(python3 -c 'import shlex,sys; print(shlex.join([sys.executable, sys.argv[1], "SessionStart"]))' "${REPO_ROOT}/scripts/hooks/beads-hook.py")"
 actual_session_command="$(jq -r '.hooks.SessionStart[0].hooks[0].command' "${CODEX_HOME}/hooks.json")"
 [ "${actual_session_command}" = "${expected_session_command}" ] || {
   printf 'SessionStart hook mismatch: expected=[%s] actual=[%s]\n' "${expected_session_command}" "${actual_session_command}" >&2
@@ -134,3 +134,13 @@ bash "${REPO_ROOT}/scripts/setup-beads.sh" >/dev/null
 [ -L "${CODEX_HOME}/AGENTS.md" ]
 cmp "${REPO_ROOT}/rules/AGENTS.md" "${CODEX_HOME}/AGENTS.md"
 printf 'PASS: empty local rules, existing generated files and setup rejection preserve expected state\n'
+
+cp "${CODEX_HOME}/hooks.json" "${TEST_ROOT}/hooks-before-missing.json"
+if PYTHON_COMMAND=missing-python-command bash "${REPO_ROOT}/scripts/setup-beads.sh" > "${TEST_ROOT}/missing-python.log" 2>&1; then
+  echo 'Missing Python should block setup' >&2
+  exit 1
+fi
+cmp "${CODEX_HOME}/hooks.json" "${TEST_ROOT}/hooks-before-missing.json"
+[ "$(jq '[.hooks.PreToolUse[]?.hooks[]? | select(.statusMessage == "my-codex-rules: bash-guard.py")] | length' "${CODEX_HOME}/hooks.json")" = 1 ]
+[ "$(jq '[.hooks.PostToolUse[]?.hooks[]? | select(.statusMessage == "my-codex-rules: md-lint.py")] | length' "${CODEX_HOME}/hooks.json")" = 1 ]
+printf 'PASS: convention hooks are installed once and missing Python preserves configuration\n'

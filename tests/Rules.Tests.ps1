@@ -61,8 +61,8 @@ Invoke-TestCase '共通ルールは留保付きの発言を実行指示として
     Assert-True ($rules.Contains('「かもしれない」「かも」「気がする」')) '留保付き発言の具体例がありません。'
     Assert-True ($rules.Contains('実行の指示ではない')) '留保付き発言を実行指示から区別していません。'
     Assert-True ($rules.Contains('そのまま着手せず')) '留保付き発言を受けたときに着手を止める規則がありません。'
-    Assert-True ($rules.Contains('確かめた結果か対応案')) '利用者へ返す判断材料がありません。'
-    Assert-True ($rules.Contains('判断を利用者へ返')) '利用者が未決定の判断を委ね直す規則がありません。'
+    Assert-True ($rules.Contains('確かめた結果か対応案')) '依頼者へ返す判断材料がありません。'
+    Assert-True ($rules.Contains('判断を依頼者へ返')) '依頼者が未決定の判断を委ね直す規則がありません。'
 }
 
 Invoke-TestCase '共通ルールは疑問の形を全出力から除く' {
@@ -71,7 +71,7 @@ Invoke-TestCase '共通ルールは疑問の形を全出力から除く' {
     Assert-True ($rules.Contains('用言に「か」が付く節')) '禁止対象が用言に続く「か」だと明記されていません。'
     Assert-True ($rules.Contains('成否、要否、可否、有無、当否、適否、原因、方法、範囲、状況')) '疑問節の言い換えに使う名詞がありません。'
     Assert-True ($rules.Contains('体言を並べる「A か B」')) '体言を並べる例外がありません。'
-    Assert-True ($rules.Contains('利用者へ判断を求める問いかけの文末')) '利用者への問いかけの例外がありません。'
+    Assert-True ($rules.Contains('依頼者へ判断を求める問いかけの文末')) '依頼者への問いかけの例外がありません。'
     foreach ($phrase in @('必要があるか確認', '記録がないか検索', '必要かどうかです', '修正するか削除', 'テストを先に書くかは', '正しいのかを毎回推論', '名詞へ畳むか', '助詞へ直すか', '文を分けるか')) {
         Assert-True (-not $rules.Contains($phrase)) "新しい原則に反する既存表現が残っています: $phrase"
     }
@@ -93,7 +93,7 @@ Invoke-TestCase '日本語技術文書の詳細規則はスキルとして分離
     $skill = [System.IO.File]::ReadAllText($writingSkillPath)
     $metadata = [System.IO.File]::ReadAllText($writingSkillMetadataPath)
     Assert-True (-not $rules.Contains('## Documentation')) '日本語技術文書の詳細規則が共通ルールに残っています。'
-    Assert-True ($rules.Contains('ユーザーへの応答は日本語で書いてください')) '全出力に必要な日本語規則が共通ルールから失われています。'
+    Assert-True ($rules.Contains('依頼者への応答は日本語で書いてください')) '全出力に必要な日本語規則が共通ルールから失われています。'
     Assert-True ($rules.Contains('不自然な半角スペース')) '全出力に必要な空白規則が共通ルールから失われています。'
     Assert-True ($skill.Contains('日本語の技術文書')) '日本語技術文書を対象とする説明がありません。'
     Assert-True ($skill.Contains('全角かっこ')) '移動対象の表記規則がスキルにありません。'
@@ -108,5 +108,5 @@ Invoke-TestCase '技術ブログ専用スキルは一般文書と区別して呼
     $blog = [System.IO.File]::ReadAllText($blogSkillPath)
     Assert-True ($rules.Contains('`technical-blog-writing` スキルを使ってください')) '共通ルールにブログスキルの呼出し条件がありません。'
     Assert-True ($blog.Contains('Do not use for README files, design documents, plans, reports')) '一般文書の除外がdescriptionにありません。'
-    Assert-True ($blog.Contains('`japanese-technical-writing`スキルも併用')) '日本語記法の参照先がありません。'
+    Assert-True ($blog.Contains('`japanese-technical-writing` スキルも併用')) '日本語記法の参照先がありません。'
 }

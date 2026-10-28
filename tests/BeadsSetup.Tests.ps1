@@ -614,3 +614,47 @@ Invoke-TestCase '標準セットアップの再実行はPC固有ルールの追�
         Remove-Item -LiteralPath $root -Recurse -Force
     }
 }
+
+Invoke-TestCase 'Python不足を既存設定の変更前に拒否する' {
+    $root = New-TestDirectory
+    try {
+        $fake = Join-Path $root 'fake.ps1'
+        [System.IO.File]::WriteAllText($fake, "Write-Output 'fake 1.0'`nexit 0`n")
+        $codexHome = Join-Path $root 'codex'
+        [System.IO.Directory]::CreateDirectory($codexHome) | Out-Null
+        $config = Join-Path $codexHome 'config.toml'
+        [System.IO.File]::WriteAllText($config, 'preserve')
+        $rejected = $false
+        try {
+            & $setupPath -HomePath $root -CodexHome $codexHome -BdCommand $fake -CodexCommand $fake -JqCommand $fake -PythonCommand 'missing-python-command'
+        }
+        catch { $rejected = $_.Exception.Message.Contains('missing-python-command') }
+        Assert-True $rejected 'Python不足が拒否されませんでした。'
+        Assert-Equal 'preserve' ([System.IO.File]::ReadAllText($config)) '拒否時に設定が変更されました。'
+        Assert-True (-not (Test-Path (Join-Path $codexHome 'my-codex-rules-beads'))) '拒否時に管理領域が作られました。'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force }
+}
+
+Invoke-TestCase '規約フックの更新拒否と解除で依頼者の変更を保全する' {
+    $root = New-TestDirectory
+    try {
+        $fake = Join-Path $root 'fake.ps1'
+        [System.IO.File]::WriteAllText($fake, "Write-Output 'fake 1.0'`nexit 0`n")
+        $codexHome = Join-Path $root 'codex'
+        $arguments = @{ HomePath=$root; CodexHome=$codexHome; BdCommand=$fake; CodexCommand=$fake; JqCommand=$fake }
+        & $setupPath @arguments
+        $guard = Join-Path $codexHome 'my-codex-rules-beads/hooks/bash-guard.py'
+        [System.IO.File]::AppendAllText($guard, "`n# user edit`n")
+        $before = [System.IO.File]::ReadAllText($guard)
+        $rejected = $false
+        try { & $setupPath @arguments }
+        catch { $rejected = $_.Exception.Message.Contains('規約フックは上書きしません') }
+        Assert-True $rejected '変更済みフックの更新が拒否されませんでした。'
+        & $teardownPath -HomePath $root -CodexHome $codexHome -BdCommand $fake
+        Assert-Equal $before ([System.IO.File]::ReadAllText($guard)) '解除で変更済みフックが失われました。'
+        $hooks = [System.IO.File]::ReadAllText((Join-Path $codexHome 'hooks.json'))
+        Assert-True (-not $hooks.Contains('my-codex-rules:')) '解除後に規約フックの登録が残りました。'
+    }
+    finally { Remove-Item -LiteralPath $root -Recurse -Force }
+}

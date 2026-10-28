@@ -4,7 +4,8 @@ param(
     [string]$CodexHome = $(if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HomePath '.codex' }),
     [string]$BdCommand = 'bd',
     [string]$JqCommand = 'jq',
-    [string]$CodexCommand = 'codex'
+    [string]$CodexCommand = 'codex',
+    [string]$PythonCommand = 'python3'
 )
 
 Set-StrictMode -Version Latest
@@ -171,18 +172,22 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
     throw 'PowerShell 7以降が必要です。'
 }
 
-$dependencies = @($BdCommand, $JqCommand, $CodexCommand)
+$dependencies = @($BdCommand, $JqCommand, $CodexCommand, $PythonCommand)
 foreach ($dependency in $dependencies) {
     if (-not (Test-ExternalCommand -Name $dependency)) {
         throw "依存コマンドが見つかりません: $dependency"
     }
 }
 
+& $PythonCommand -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)'
+if ($LASTEXITCODE -ne 0) { throw 'Python 3.8以降が必要です。' }
+
 $versions = [ordered]@{}
 foreach ($entry in @(
     [pscustomobject]@{ Name = 'bd'; Command = $BdCommand },
     [pscustomobject]@{ Name = 'jq'; Command = $JqCommand },
-    [pscustomobject]@{ Name = 'codex'; Command = $CodexCommand }
+    [pscustomobject]@{ Name = 'codex'; Command = $CodexCommand },
+    [pscustomobject]@{ Name = 'python'; Command = $PythonCommand }
 )) {
     $versionOutput = & $entry.Command --version
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($versionOutput -join ' '))) {
@@ -294,6 +299,14 @@ if ([System.IO.Directory]::Exists($paths.TechnicalBlogWritingPath)) {
     }
 }
 
+$conventionPath = Join-Path $paths.RuntimeRoot 'hooks'
+$expectedConventionDigest = if ($null -ne $previousState -and $null -ne $previousState.PSObject.Properties['convention_digest']) { [string]$previousState.convention_digest } else { $null }
+if ([System.IO.Directory]::Exists($conventionPath)) {
+    if ([string]::IsNullOrWhiteSpace($expectedConventionDigest) -or (Get-TreeDigest -Path $conventionPath) -ne $expectedConventionDigest) {
+        throw "管理対象と確認できない規約フックは上書きしません: $conventionPath"
+    }
+}
+
 $rollbackRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('my-codex-rules-setup-rollback-' + [guid]::NewGuid().ToString('N'))
 [System.IO.Directory]::CreateDirectory($rollbackRoot) | Out-Null
 $rollbackManifest = New-BeadsBackup -CodexHome $paths.CodexHome -BackupRoot (Join-Path $rollbackRoot 'codex-files')
@@ -343,11 +356,15 @@ try {
     $hookCommand = 'pwsh -NoProfile -File "' + $paths.NudgeScriptPath + '"'
     Add-BeadsStopHook -HooksPath $paths.HooksPath -Command $hookCommand
 
+    $conventionDigest = Copy-OwnedTree -Source (Join-Path $PSScriptRoot 'hooks') -Destination $conventionPath -ExpectedDigest $expectedConventionDigest
+    & $PythonCommand (Join-Path $PSScriptRoot 'manage-hooks.py') $paths.HooksPath $conventionPath
+    if ($LASTEXITCODE -ne 0) { throw '規約フックの登録に失敗しました。' }
+
     $skillDigest = Copy-OwnedTree -Source $sourceSkillPath -Destination $paths.ProjectBootstrapPath -ExpectedDigest $expectedSkillDigest
     $writingSkillDigest = Copy-OwnedTree -Source $sourceWritingSkillPath -Destination $paths.JapaneseTechnicalWritingPath -ExpectedDigest $expectedWritingSkillDigest
     $blogSkillDigest = Copy-OwnedTree -Source $sourceBlogSkillPath -Destination $paths.TechnicalBlogWritingPath -ExpectedDigest $expectedBlogSkillDigest
     $state = [pscustomobject]@{
-        version = 3
+        version = 4
         installed = $true
         installed_at = [DateTimeOffset]::UtcNow.ToString('o')
         home_path = $paths.HomePath
@@ -355,6 +372,7 @@ try {
         backup_manifest = $backupManifest
         hook_command = $hookCommand
         global_agents_digest = Get-FileDigest -Path $globalAgentsPath
+        convention_digest = $conventionDigest
         nudge_digest = Get-FileDigest -Path $paths.NudgeScriptPath
         project_bootstrap_digest = $skillDigest
         japanese_technical_writing_digest = $writingSkillDigest
