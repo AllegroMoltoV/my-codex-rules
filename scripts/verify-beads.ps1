@@ -55,6 +55,7 @@ function Get-UserSnapshot {
         bootstrap_skill = Get-DirectoryHashOrState -Path (Join-Path $actualHome '.agents\skills\project-bootstrap')
         writing_skill = Get-DirectoryHashOrState -Path (Join-Path $actualHome '.agents\skills\japanese-technical-writing')
         blog_skill = Get-DirectoryHashOrState -Path (Join-Path $actualHome '.agents\skills\technical-blog-writing')
+        test_skill = Get-DirectoryHashOrState -Path (Join-Path $actualHome '.agents\skills\software-test')
         metrics = Get-FileHashOrState -Path (Join-Path $actualHome '.config\bd\config.yaml')
     }
 }
@@ -99,6 +100,7 @@ function Get-ManagedSnapshot {
         bootstrap_skill = Get-DirectoryHashOrState -Path (Join-Path $Environment.Home '.agents\skills\project-bootstrap')
         writing_skill = Get-DirectoryHashOrState -Path (Join-Path $Environment.Home '.agents\skills\japanese-technical-writing')
         blog_skill = Get-DirectoryHashOrState -Path (Join-Path $Environment.Home '.agents\skills\technical-blog-writing')
+        test_skill = Get-DirectoryHashOrState -Path (Join-Path $Environment.Home '.agents\skills\software-test')
         convention = Get-DirectoryHashOrState -Path (Join-Path $Environment.CodexHome 'my-codex-rules-beads\hooks')
         nudge = Get-FileHashOrState -Path (Join-Path $Environment.CodexHome 'my-codex-rules-beads\beads-stop-nudge.ps1')
     }
@@ -188,6 +190,7 @@ try {
     Assert-Condition ($afterFirstSetup.bootstrap_skill -ne 'missing') 'project-bootstrapスキルが配置されませんでした。'
     Assert-Condition ($afterFirstSetup.writing_skill -ne 'missing') 'japanese-technical-writingスキルが配置されませんでした。'
     Assert-Condition ($afterFirstSetup.blog_skill -ne 'missing') 'technical-blog-writingスキルが配置されませんでした。'
+    Assert-Same (Get-DirectoryHashOrState -Path (Join-Path $repoRoot 'skills/software-test')) $afterFirstSetup.test_skill 'software-testスキルが配布原本と一致しません。'
     Assert-Condition ($afterFirstSetup.nudge -ne 'missing') '記録漏れ通知スクリプトが配置されませんでした。'
     $globalAgentsPath = Join-Path $normalEnvironment.CodexHome 'AGENTS.md'
     $globalAgents = [System.IO.File]::ReadAllText($globalAgentsPath)
@@ -307,6 +310,7 @@ try {
     Assert-Same 'missing' (Get-DirectoryHashOrState -Path (Join-Path $normalEnvironment.Home '.agents\skills\project-bootstrap')) '通常取り消し後もproject-bootstrapスキルが残っています。'
     Assert-Same 'missing' (Get-DirectoryHashOrState -Path (Join-Path $normalEnvironment.Home '.agents\skills\japanese-technical-writing')) '通常取り消し後も日本語技術文書スキルが残っています。'
     Assert-Same 'missing' (Get-DirectoryHashOrState -Path (Join-Path $normalEnvironment.Home '.agents\skills\technical-blog-writing')) '通常取り消し後も技術ブログ執筆スキルが残っています。'
+    Assert-Same 'missing' (Get-DirectoryHashOrState -Path (Join-Path $normalEnvironment.Home '.agents\skills\software-test')) '通常取り消し後もsoftware-testスキルが残っています。'
 
     $restoreEnvironment = New-IsolatedEnvironment -Name 'restore' -ConfigMissing
     $restoreBefore = Get-ManagedSnapshot -Environment $restoreEnvironment
@@ -323,6 +327,7 @@ try {
     Assert-Same 'missing' $restoreAfter.bootstrap_skill 'project-bootstrapスキルが取り消されませんでした。'
     Assert-Same 'missing' $restoreAfter.writing_skill 'japanese-technical-writingスキルが取り消されませんでした。'
     Assert-Same 'missing' $restoreAfter.blog_skill 'technical-blog-writingスキルが取り消されませんでした。'
+    Assert-Same 'missing' $restoreAfter.test_skill 'software-testスキルが取り消されませんでした。'
 
     Invoke-Setup -Environment $restoreEnvironment
     $reinstalledAgents = [System.IO.File]::ReadAllText((Join-Path $restoreEnvironment.CodexHome 'AGENTS.md'))

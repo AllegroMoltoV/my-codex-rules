@@ -631,6 +631,7 @@ function Get-BeadsManagedPaths {
         ProjectBootstrapPath = Join-Path $resolvedHome '.agents\skills\project-bootstrap'
         JapaneseTechnicalWritingPath = Join-Path $resolvedHome '.agents\skills\japanese-technical-writing'
         TechnicalBlogWritingPath = Join-Path $resolvedHome '.agents\skills\technical-blog-writing'
+        SoftwareTestPath = Join-Path $resolvedHome '.agents\skills\software-test'
         BeadsSkillPath = Join-Path $resolvedHome '.agents\skills\beads'
     }
 }

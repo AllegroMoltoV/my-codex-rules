@@ -207,6 +207,7 @@ $sourceRulesPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'rules\AGENTS.md
 $sourceSkillPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'skills\project-bootstrap'
 $sourceWritingSkillPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'skills\japanese-technical-writing'
 $sourceBlogSkillPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'skills\technical-blog-writing'
+$sourceTestSkillPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'skills\software-test'
 $sourceNudgePath = Join-Path $PSScriptRoot 'beads-stop-nudge.ps1'
 if (-not [System.IO.File]::Exists($sourceRulesPath)) {
     throw "グローバルルールがありません: $sourceRulesPath"
@@ -219,6 +220,9 @@ if (-not [System.IO.Directory]::Exists($sourceWritingSkillPath)) {
 }
 if (-not [System.IO.Directory]::Exists($sourceBlogSkillPath)) {
     throw "technical-blog-writingスキルがありません: $sourceBlogSkillPath"
+}
+if (-not [System.IO.Directory]::Exists($sourceTestSkillPath)) {
+    throw "software-testスキルがありません: $sourceTestSkillPath"
 }
 if (-not [System.IO.File]::Exists($sourceNudgePath)) {
     throw "記録漏れ通知スクリプトがありません: $sourceNudgePath"
@@ -299,6 +303,17 @@ if ([System.IO.Directory]::Exists($paths.TechnicalBlogWritingPath)) {
     }
 }
 
+$expectedTestSkillDigest = if (
+    $null -ne $previousState -and
+    $null -ne $previousState.PSObject.Properties['software_test_digest']
+) { [string]$previousState.software_test_digest } else { $null }
+if ([System.IO.Directory]::Exists($paths.SoftwareTestPath)) {
+    $existingTestSkillDigest = Get-TreeDigest -Path $paths.SoftwareTestPath
+    if ([string]::IsNullOrWhiteSpace($expectedTestSkillDigest) -or $existingTestSkillDigest -ne $expectedTestSkillDigest) {
+        throw "既存のsoftware-testスキルは管理対象と確認できないため変更しません: $($paths.SoftwareTestPath)"
+    }
+}
+
 $conventionPath = Join-Path $paths.RuntimeRoot 'hooks'
 $expectedConventionDigest = if ($null -ne $previousState -and $null -ne $previousState.PSObject.Properties['convention_digest']) { [string]$previousState.convention_digest } else { $null }
 if ([System.IO.Directory]::Exists($conventionPath)) {
@@ -316,6 +331,7 @@ $treeSnapshots = @(
     New-TreeSnapshot -Path $paths.ProjectBootstrapPath -SnapshotRoot $rollbackRoot -Name 'project-bootstrap'
     New-TreeSnapshot -Path $paths.JapaneseTechnicalWritingPath -SnapshotRoot $rollbackRoot -Name 'japanese-technical-writing'
     New-TreeSnapshot -Path $paths.TechnicalBlogWritingPath -SnapshotRoot $rollbackRoot -Name 'technical-blog-writing'
+    New-TreeSnapshot -Path $paths.SoftwareTestPath -SnapshotRoot $rollbackRoot -Name 'software-test'
 )
 $wasInstalled = (
     $null -ne $previousState -and
@@ -363,6 +379,7 @@ try {
     $skillDigest = Copy-OwnedTree -Source $sourceSkillPath -Destination $paths.ProjectBootstrapPath -ExpectedDigest $expectedSkillDigest
     $writingSkillDigest = Copy-OwnedTree -Source $sourceWritingSkillPath -Destination $paths.JapaneseTechnicalWritingPath -ExpectedDigest $expectedWritingSkillDigest
     $blogSkillDigest = Copy-OwnedTree -Source $sourceBlogSkillPath -Destination $paths.TechnicalBlogWritingPath -ExpectedDigest $expectedBlogSkillDigest
+    $testSkillDigest = Copy-OwnedTree -Source $sourceTestSkillPath -Destination $paths.SoftwareTestPath -ExpectedDigest $expectedTestSkillDigest
     $state = [pscustomobject]@{
         version = 4
         installed = $true
@@ -377,6 +394,7 @@ try {
         project_bootstrap_digest = $skillDigest
         japanese_technical_writing_digest = $writingSkillDigest
         technical_blog_writing_digest = $blogSkillDigest
+        software_test_digest = $testSkillDigest
         dependency_versions = $versions
     }
     Write-Utf8JsonFile -Path $paths.StatePath -InputObject $state
@@ -421,7 +439,7 @@ if ([System.IO.Directory]::Exists($rollbackRoot)) {
     Remove-Item -LiteralPath $rollbackRoot -Recurse -Force
 }
 
-Write-Host '共通ルール、3つのスキル、Auto-review、BeadsのCodex統合を設定しました。'
+Write-Host '共通ルール、4つのスキル、Auto-review、BeadsのCodex統合を設定しました。'
 Write-Host "bd: $($versions.bd)"
 Write-Host "jq: $($versions.jq)"
 Write-Host "codex: $($versions.codex)"

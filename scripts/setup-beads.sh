@@ -36,7 +36,7 @@ if [ -e "${AGENTS_DST}" ] && [ ! -L "${AGENTS_DST}" ] && ! cmp -s "${REPO_ROOT}/
     exit 1
   fi
 fi
-for skill_name in project-bootstrap japanese-technical-writing technical-blog-writing; do
+for skill_name in project-bootstrap japanese-technical-writing technical-blog-writing software-test; do
   skill_dst="${SKILLS_DIR}/${skill_name}"
   if [ -e "${skill_dst}" ] && [ ! -L "${skill_dst}" ]; then
     echo "[fail] 既存スキルが実体ディレクトリのため変更しません: ${skill_dst}" >&2
@@ -86,6 +86,7 @@ fi
 link_path "${REPO_ROOT}/skills/project-bootstrap" "${SKILLS_DIR}/project-bootstrap"
 link_path "${REPO_ROOT}/skills/japanese-technical-writing" "${SKILLS_DIR}/japanese-technical-writing"
 link_path "${REPO_ROOT}/skills/technical-blog-writing" "${SKILLS_DIR}/technical-blog-writing"
+link_path "${REPO_ROOT}/skills/software-test" "${SKILLS_DIR}/software-test"
 
 tmp_hooks="$(mktemp)"
 trap 'rm -f "${tmp_hooks:-}" "${tmp_config:-}"' EXIT

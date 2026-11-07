@@ -6,7 +6,7 @@ Codex は共通の指示を `$CODEX_HOME/AGENTS.md`、再利用可能な手順�
 
 ## 使い方
 
-2 つのフェーズに分かれます。**フェーズ 1 は端末の設定、フェーズ 2 はプロジェクトごとの初期設定です。** フェーズ 1 のセットアップは、初回導入とルール更新時に実行します。
+フェーズ 1 では端末を設定します。初回導入とルール更新時に実行します。フェーズ 2 ではプロジェクトごとの初期設定を行います。
 
 ### フェーズ 1: グローバルの初回セットアップ
 
@@ -23,7 +23,7 @@ cd my-codex-rules
 pwsh -NoProfile -File scripts/setup-beads.ps1
 ```
 
-macOS では PowerShell を追加せず、POSIX シェル版を使います。3 つのスキルはリポジトリへのシンボリックリンクで配置します。共通ルールは、PC 固有ルールがなければリンク、あれば結合した通常ファイルとして配置します。
+macOS では PowerShell を追加せず、POSIX シェル版を使います。4 つのスキルはリポジトリへのシンボリックリンクで配置します。共通ルールは、PC 固有ルールがなければリンク、あれば結合した通常ファイルとして配置します。
 
 ```bash
 git clone https://github.com/AllegroMoltoV/my-codex-rules.git
@@ -31,13 +31,13 @@ cd my-codex-rules
 bash scripts/setup-beads.sh
 ```
 
-セットアップは、共通ルール、3 つのスキル、Auto-review、Beads の Codex 統合、規約フック、記録漏れ通知フックをグローバル領域へ導入します。既存の Codex 設定は先にバックアップします。`bd`、`jq`、Python は導入しません。見つからない場合は変更前に中止します。
+セットアップは、共通ルール、4 つのスキル、Auto-review、Beads の Codex 統合、規約フック、記録漏れ通知フックをグローバル領域へ導入します。既存の Codex 設定は先にバックアップします。`bd`、`jq`、Python は導入しません。見つからない場合は変更前に中止します。
 
 非空の `$CODEX_HOME/AGENTS.override.md` がある場合、Codex は同じ階層の `AGENTS.md` を読み込みません。セットアップは無効な導入を成功扱いにせず、設定変更前に停止します。override の内容を共通ルールへ統合する、または一時的に退避してから再実行してください。0 バイトの override は Codex が読み飛ばすため停止対象ではありません。
 
-### PC 固有ルールの追加 (任意)
+### PC 固有ルールの追加
 
-この PC だけで使うルールを残したい場合は、`$CODEX_HOME/AGENTS.local.md` を UTF-8 で作成します。`CODEX_HOME` が未設定の場合は `~/.codex/AGENTS.local.md` です。リポジトリの共通原本や生成済みの `AGENTS.md` へ個人のルールを直接追記せず、この原本を編集してください。
+この PC だけで使うルールが必要な場合は、`$CODEX_HOME/AGENTS.local.md` を UTF-8 で作成します。`CODEX_HOME` が未設定の場合は `~/.codex/AGENTS.local.md` です。リポジトリの共通原本や生成済みの `AGENTS.md` へ個人のルールを直接追記せず、この原本を編集してください。
 
 ```markdown
 # AGENTS.local.md
@@ -58,7 +58,7 @@ PC 固有ルールを解除する場合は、`AGENTS.local.md` を空にする�
 3. コピーした INIT に要件、前提条件と制約、完了条件を書く
 4. そのプロジェクトで Codex を起動し、`$project-bootstrap を使って .prompts/INIT.md を実行してください`と依頼する
 
-**残りは Codex が行います。** `$project-bootstrap` が Git、除外設定、作業用ディレクトリ、文書索引、Beads を初期設定します。その後、要件に関係する現状を調査し、計画が必要な作業、複数セッションへまたがる作業、依存関係、ブロッカー、後続課題を Beads へ登録します。このスキルは状態を変更するため暗黙起動を無効にしています。Codex への依頼文に `$project-bootstrap` を含める必要があり、INIT 内の記載だけでは明示起動になりません。
+`$project-bootstrap` が Git、除外設定、作業用ディレクトリ、文書索引、Beads を初期設定します。その後、要件に関係する現状を調査し、計画が必要な作業、複数セッションへまたがる作業、依存関係、ブロッカー、後続課題を Beads へ登録します。このスキルは状態を変更するため暗黙起動を無効にしています。Codex への依頼文に `$project-bootstrap` を含める必要があり、INIT 内の記載だけでは明示起動になりません。
 
 `workspace-write` でも `.git/info/exclude` が保護される場合があります。その場合、Codex は対象プロジェクトと bootstrap コマンドに限定して権限昇格を求めます。拒否された場合は除外設定を未完了として報告し、サンドボックス全体を無効にしません。
 
@@ -73,6 +73,7 @@ PC 固有ルールを解除する場合は、`AGENTS.local.md` を空にする�
 | `skills/project-bootstrap/` | INIT から呼び出すプロジェクト初期セットアップスキル |
 | `skills/japanese-technical-writing/` | README、設計書、報告書などの日本語技術文書を作成、改稿するスキル |
 | `skills/technical-blog-writing/` | 技術ブログの執筆戦略、初稿、改稿、校正に使うスキル |
+| `skills/software-test/` | テストの対象、アクセス権限の境界、フィクスチャ、テストランナー移行の検証を定めるスキル |
 | `scripts/setup-beads.ps1` | 共通ルール、スキル、Beads 統合、通知フックの導入 |
 | `scripts/setup-beads.sh` | macOS 向けの標準セットアップ。PC 固有ルールの結合にも対応 |
 | `scripts/setup-local-rules.sh` | macOS 標準セットアップから呼ぶルール結合処理 |
@@ -97,7 +98,7 @@ Beads の公式フックを呼ぶ子プロセスでは、`BD_NO_GIT_OPS` が未�
 
 ## 補足
 
-**更新時も同じセットアップを実行します。** 本リポジトリで最新を取り込んだ後、OS に合う次の手順を実行し、新しい Codex セッションを開始してください。PC 固有ルールがある場合、`git pull` だけでは生成済み `AGENTS.md` は更新されません。
+本リポジトリで最新を取り込んだ後、初回と同じ OS 別セットアップを実行し、新しい Codex セッションを開始してください。PC 固有ルールがある場合、`git pull` だけでは生成済み `AGENTS.md` は更新されません。
 
 Windows:
 
@@ -115,13 +116,13 @@ bash scripts/setup-beads.sh
 
 PowerShell 版は、導入後に出力の `AGENTS.md` やスキルが直接変更されていれば、上書きせず中止します。macOS 版も管理対象と確認できない `AGENTS.md` を上書きしません。生成済みファイルではなく、共通原本または PC 固有原本を編集してください。pull が未コミット変更のために停止した場合は、その変更を保全し、採用する内容を決めてから統合します。
 
-**Auto-review はサンドボックスを解除しません。** `approval_policy` が未設定なら `on-request`、`approvals_reviewer` が未設定なら `auto_review` を利用者の `config.toml` へ追加します。既存値は上書きせず、Auto-review が有効にならない可能性を警告します。設定は新しい Codex セッションから有効です。Auto-review は承認対象の操作を別の審査エージェントへ送り、追加のモデル呼び出しを使います。高危険度操作、組織の管理方針、プロジェクト固有設定、サンドボックスの保護範囲を上書きする機能ではありません。
+`approval_policy` が未設定なら `on-request`、`approvals_reviewer` が未設定なら `auto_review` を利用者の `config.toml` へ追加します。既存値は上書きせず、Auto-review が有効にならない可能性を警告します。設定は新しい Codex セッションから有効です。Auto-review は承認対象の操作を別の審査エージェントへ送り、追加のモデル呼び出しを使います。高危険度操作、組織の管理方針、プロジェクト固有設定、サンドボックスの保護範囲を上書きする機能ではありません。
 
-**計画、引き継ぎ、作業記憶は Beads に集約します。** 複数セッションへまたがる作業では、親課題に現在の計画と決定事項、各課題に現在地を記録します。継続して必要な知見は `bd remember` に保存します。確定、仮決め、未決定と、確定させる条件・時点・判断主体を区別します。相談は会話内で行い、合意の内容と理由は Codex が記録します。Claude Code の auto memory、Codex の `AGENTS.md`、`.prompts/PLANS` や `.prompts/DISCUSSIONS` へ同じ情報を重複して保存しません。
+計画、引き継ぎ、作業記憶は Beads に集約します。複数セッションへまたがる作業では、親課題に現在の計画と決定事項、各課題に現在地を記録します。継続して必要な知見は `bd remember` に保存します。確定、仮決め、未決定と、確定させる条件・時点・判断主体を区別します。相談は会話内で行い、合意の内容と理由は Codex が記録します。Claude Code の auto memory、Codex の `AGENTS.md`、`.prompts/PLANS` や `.prompts/DISCUSSIONS` へ同じ情報を重複して保存しません。
 
-**このリポジトリも Beads で管理します。** `.beads-optout` は置かず、計画、実行状態、ブロッカーを Beads に記録します。`.beads/` は進捗データを含むため、取り消し処理や一時ファイル削除の対象にしません。
+このリポジトリも Beads で管理します。`.beads-optout` は置かず、計画、実行状態、ブロッカーを Beads に記録します。`.beads/` は進捗データを含むため、取り消し処理や一時ファイル削除の対象にしません。
 
-**通常の取り消しでは共通ルールと Codex 設定を残します。** Beads 統合、規約・通知フック、3 つのスキルだけを削除する場合は、次を実行します。
+通常の取り消しでは共通ルールと Codex 設定を残します。Beads 統合、規約・通知フック、4 つのスキルだけを削除する場合は、次を実行します。
 
 ```powershell
 pwsh -NoProfile -File scripts/teardown-beads.ps1
@@ -133,11 +134,11 @@ pwsh -NoProfile -File scripts/teardown-beads.ps1
 pwsh -NoProfile -File scripts/teardown-beads.ps1 -Restore
 ```
 
-**配布用 INIT の正本はひとつです。** Git 管理下の `.prompts/INIT.md` だけを更新します。計画と合意は Beads に記録し、調査報告、実行ログなどの作業資料は `.appendix` または `.logs` に置きます。公開用の `.prompts` 配下へ混在させません。
+Git 管理下の `.prompts/INIT.md` だけを更新します。計画と合意は Beads に記録し、調査報告、実行ログなどの作業資料は `.appendix` または `.logs` に置きます。公開用の `.prompts` 配下へ混在させません。
 
 `.prompts/DRAFT/` の文案、`.tmp/` の一時ファイル、`.logs/` のログは、各ディレクトリ直下にフラットに置きます。ファイル名の接頭辞は `yyyymmddnn` とし、同じ日付・同じディレクトリ内で `nn` を `01` から順に増やします。
 
-**Windows は PowerShell 7 以降、macOS は POSIX シェルに対応します。** セットアップスクリプトは `codex`、`bd`、`jq`、Python 3.8 以降の存在を確認します。
+Windows では PowerShell 7 以降を、macOS では POSIX シェルを使います。セットアップスクリプトは `codex`、`bd`、`jq`、Python 3.8 以降の存在を確認します。
 
 ## 開発時の検証
 
@@ -165,6 +166,7 @@ MIT License です。詳細は [LICENSE](LICENSE) を参照してください。
 
 | バージョン | 日付 | 内容 |
 |---|---|---|
+| v1.21.0 | 2026-11-07 | Claude Code 版 v2.26.0 の文章規則とテストの判断基準を反映。`software-test` を追加し、Windows と macOS の標準セットアップに組み込んだ |
 | v1.20.0 | 2026-11-04 | Claude Code 版 v2.24.1〜v2.25.0 を反映。打ち合わせの事前確認、文章の強調表現、技術ブログの題名・抜粋・図の規則を更新 |
 | v1.19.0 | 2026-10-28 | Claude Code 版 v2.22.0〜v2.24.0 を Codex 向けに反映。技術ブログ規則、依頼者の定義、一時制約と優先度の管理を更新。規約フックを両 OS のセットアップへ統合し、公式 Beads フックへ環境変数の既定値を渡す方式へ変更 |
 | v1.18.0 | 2026-09-26 | 文案・一時ファイル・ログのフラット配置と `yyyymmddnn` 接頭辞を追加。作業記憶の保存先を Beads に統一し、ログ保存例も新しい命名規則へ更新 |

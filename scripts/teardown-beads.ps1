@@ -115,6 +115,20 @@ if (
     }
 }
 
+if (
+    $null -ne $state -and
+    $null -ne $state.PSObject.Properties['software_test_digest'] -and
+    [System.IO.Directory]::Exists($paths.SoftwareTestPath)
+) {
+    $currentTestSkillDigest = Get-TreeDigest -Path $paths.SoftwareTestPath
+    if ($currentTestSkillDigest -eq [string]$state.software_test_digest) {
+        Remove-Item -LiteralPath $paths.SoftwareTestPath -Recurse -Force
+    }
+    else {
+        Write-Warning "利用者の変更を検出したためスキルを削除しません: $($paths.SoftwareTestPath)"
+    }
+}
+
 if ($null -ne $state -and [System.IO.File]::Exists($paths.NudgeScriptPath)) {
     $currentNudgeDigest = Get-FileDigest -Path $paths.NudgeScriptPath
     if ($currentNudgeDigest -eq [string]$state.nudge_digest) {
