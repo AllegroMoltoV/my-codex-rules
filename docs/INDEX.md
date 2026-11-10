@@ -2,6 +2,7 @@
 
 ## 調査と検証
 
+- [Claude Code 版 v2.27.0 の反映](reports/2026-11-10-claude-rules-port.md): 比較結果の文書化と検証範囲の規則の移植、検証結果を記録する。
 - [Claude Code 版 v2.26.0 の反映](reports/2026-11-07-claude-rules-port.md) — 文章規則とテストスキルの移植範囲、セットアップの検証結果を記録する。
 
 - [Claude Code 版 v2.25.0 の反映](reports/2026-11-04-claude-rules-port.md): 変更の採否と検証結果を記録する。
