@@ -2,6 +2,7 @@
 .appendix/
 .tmp/
 .logs/
+.reports/
 .prompts/
 AGENTS.md
 .beads/

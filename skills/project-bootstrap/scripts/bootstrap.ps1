@@ -22,7 +22,7 @@ function Add-ExcludeEntries {
     )
     [System.IO.Directory]::CreateDirectory((Split-Path -Parent $ExcludePath)) | Out-Null
     $existingLines = if ([System.IO.File]::Exists($ExcludePath)) { @([System.IO.File]::ReadAllLines($ExcludePath)) } else { @() }
-    $comparison = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $comparison = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     foreach ($line in $existingLines) {
         [void]$comparison.Add($line.Trim())
     }
@@ -80,27 +80,6 @@ foreach ($template in @($excludeTemplate)) {
     }
 }
 
-foreach ($directory in @(
-    '.appendix',
-    '.tmp',
-    '.logs',
-    '.prompts',
-    '.prompts\PLANS',
-    '.prompts\DISCUSSIONS',
-    '.prompts\INSPECTIONS',
-    'docs',
-    'docs\reports',
-    'docs\logs'
-)) {
-    [System.IO.Directory]::CreateDirectory((Join-Path $target $directory)) | Out-Null
-}
-
-$indexPath = Join-Path $target 'docs\INDEX.md'
-if (-not [System.IO.File]::Exists($indexPath)) {
-    $index = "# 文書索引`n`n## reports`n`n調査結果と検証結果を保存します。`n`n## logs`n`n再確認が必要な実行ログを保存します。`n"
-    [System.IO.File]::WriteAllText($indexPath, $index, [System.Text.UTF8Encoding]::new($false))
-}
-
 $excludePath = $null
 if ([System.IO.Directory]::Exists($gitMarker)) {
     $excludePath = Join-Path $gitMarker 'info\exclude'
@@ -113,13 +92,51 @@ else {
         if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($resolvedExclude -join ''))) {
             throw '.git/info/excludeの場所を解決できません。'
         }
-        $excludePath = [System.IO.Path]::GetFullPath((Join-Path $target ($resolvedExclude -join '')))
+        $excludeValue = $resolvedExclude -join ''
+        $excludePath = if ([System.IO.Path]::IsPathRooted($excludeValue)) {
+            $excludeValue
+        } else {
+            [System.IO.Path]::GetFullPath((Join-Path $target $excludeValue))
+        }
     }
     finally {
         Set-Location -LiteralPath $originalLocation
     }
 }
 Add-ExcludeEntries -ExcludePath $excludePath -TemplatePath $excludeTemplate
+
+$originalLocation = Get-Location
+try {
+    Set-Location -LiteralPath $target
+    foreach ($reportPath in @('.reports/INDEX.md', '.reports/report.md')) {
+        & $GitCommand check-ignore -q -- $reportPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "Git の除外を確認できないため、調査記録を書き込みません: $reportPath"
+        }
+    }
+}
+finally {
+    Set-Location -LiteralPath $originalLocation
+}
+
+foreach ($directory in @(
+    '.appendix',
+    '.tmp',
+    '.logs',
+    '.prompts',
+    '.prompts\PLANS',
+    '.prompts\DISCUSSIONS',
+    '.prompts\INSPECTIONS',
+    '.reports'
+)) {
+    [System.IO.Directory]::CreateDirectory((Join-Path $target $directory)) | Out-Null
+}
+
+$indexPath = Join-Path $target '.reports\INDEX.md'
+if (-not [System.IO.File]::Exists($indexPath)) {
+    $index = "# 文書索引`n`n調査レポートと保存する価値がある実行ログを、このディレクトリへ保存します。Git の追跡対象には含めません。生の実行ログは .logs/ に保存します。`n"
+    [System.IO.File]::WriteAllText($indexPath, $index, [System.Text.UTF8Encoding]::new($false))
+}
 
 $optOutPath = Join-Path $target '.beads-optout'
 if (-not $NoBeads -and -not [System.IO.File]::Exists($optOutPath)) {

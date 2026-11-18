@@ -256,7 +256,7 @@ try {
         Assert-Condition ([System.IO.Directory]::Exists((Join-Path $projectPath '.beads'))) 'bootstrapでBeadsが初期化されませんでした。'
         Assert-Condition (-not [System.IO.File]::Exists((Join-Path $projectPath 'AGENTS.md'))) 'bootstrapが共通AGENTS.mdを生成しました。'
         Assert-Condition (-not [System.IO.File]::Exists((Join-Path $projectPath '.prompts\INIT.md'))) 'bootstrapがINIT.mdを生成しました。'
-        Assert-Condition ([System.IO.File]::Exists((Join-Path $projectPath 'docs\INDEX.md'))) 'bootstrapで文書索引が配置されませんでした。'
+        Assert-Condition ([System.IO.File]::Exists((Join-Path $projectPath '.reports\INDEX.md'))) 'bootstrapで文書索引が配置されませんでした。'
 
         $originalLocation = Get-Location
         try {

@@ -24,19 +24,25 @@ Invoke-TestCase 'プロジェクト初期化は既存ファイルを上書きし
     Assert-PathExists $bootstrapPath
     $root = New-TestDirectory
     try {
-        $gitDir = Join-Path $root '.git\info'
-        [System.IO.Directory]::CreateDirectory($gitDir) | Out-Null
         [System.IO.Directory]::CreateDirectory((Join-Path $root '.prompts')) | Out-Null
         $agentsPath = Join-Path $root 'AGENTS.md'
         $initPath = Join-Path $root '.prompts\INIT.md'
         [System.IO.File]::WriteAllText($agentsPath, 'existing agents')
         [System.IO.File]::WriteAllText($initPath, 'existing init')
+        [System.IO.Directory]::CreateDirectory((Join-Path $root 'docs')) | Out-Null
+        $oldIndex = Join-Path $root 'docs\INDEX.md'
+        [System.IO.File]::WriteAllText($oldIndex, 'existing docs index')
+        [System.IO.Directory]::CreateDirectory((Join-Path $root '.reports')) | Out-Null
+        $reportIndex = Join-Path $root '.reports\INDEX.md'
+        [System.IO.File]::WriteAllText($reportIndex, 'existing report index')
 
         & $bootstrapPath -TargetPath $root -NoBeads
 
         Assert-Equal 'existing agents' ([System.IO.File]::ReadAllText($agentsPath)) '既存AGENTS.mdが変更されました。'
         Assert-Equal 'existing init' ([System.IO.File]::ReadAllText($initPath)) '既存INIT.mdが変更されました。'
-        Assert-True (Test-Path -LiteralPath (Join-Path $root 'docs\INDEX.md')) 'docs/INDEX.mdが作成されませんでした。'
+        Assert-Equal 'existing docs index' ([System.IO.File]::ReadAllText($oldIndex)) '既存の docs 索引が変更されました。'
+        Assert-Equal 'existing report index' ([System.IO.File]::ReadAllText($reportIndex)) '既存の調査索引が変更されました。'
+        Assert-True (Test-Path -LiteralPath (Join-Path $root '.reports\INDEX.md')) '.reports/INDEX.mdが作成されませんでした。'
     }
     finally {
         if (Test-Path -LiteralPath $root) {
@@ -49,14 +55,11 @@ Invoke-TestCase 'プロジェクト初期化は共通AGENTS.mdとINITを生成�
     Assert-PathExists $bootstrapPath
     $root = New-TestDirectory
     try {
-        $gitDir = Join-Path $root '.git\info'
-        [System.IO.Directory]::CreateDirectory($gitDir) | Out-Null
-
         & $bootstrapPath -TargetPath $root -NoBeads
 
         Assert-True (-not [System.IO.File]::Exists((Join-Path $root 'AGENTS.md'))) 'bootstrapが共通AGENTS.mdを生成しました。'
         Assert-True (-not [System.IO.File]::Exists((Join-Path $root '.prompts\INIT.md'))) 'bootstrapがINIT.mdを生成しました。'
-        Assert-True ([System.IO.File]::Exists((Join-Path $root 'docs\INDEX.md'))) 'docs/INDEX.mdが作成されませんでした。'
+        Assert-True ([System.IO.File]::Exists((Join-Path $root '.reports\INDEX.md'))) '.reports/INDEX.mdが作成されませんでした。'
     }
     finally {
         if (Test-Path -LiteralPath $root) {
@@ -69,8 +72,6 @@ Invoke-TestCase 'NoBeadsとopt-outはBeadsを呼ばない' {
     Assert-PathExists $bootstrapPath
     $root = New-TestDirectory
     try {
-        $gitDir = Join-Path $root '.git\info'
-        [System.IO.Directory]::CreateDirectory($gitDir) | Out-Null
         [System.IO.File]::WriteAllText((Join-Path $root '.beads-optout'), '')
         & $bootstrapPath -TargetPath $root -BdCommand 'missing-bd-command'
         Assert-True (-not [System.IO.File]::Exists((Join-Path $root '.prompts\INIT.md'))) 'bootstrapがINIT.mdを生成しました。'
@@ -110,6 +111,73 @@ Invoke-TestCase 'Beads初期化前にローカル役割と除外設定を補う'
         if (Test-Path -LiteralPath $root) {
             Remove-Item -LiteralPath $root -Recurse -Force
         }
+    }
+}
+
+Invoke-TestCase '調査レポートと索引を除外し再実行でも既存除外を保持する' {
+    $root = New-TestDirectory
+    $originalLocation = Get-Location
+    try {
+        Set-Location -LiteralPath $root
+        & git init -b main
+        Assert-Equal 0 $LASTEXITCODE 'Git を初期化できませんでした。'
+        & git config core.ignorecase false
+        $excludePath = Join-Path $root '.git\info\exclude'
+        [System.IO.File]::WriteAllText($excludePath, ".REPORTS/`nexisting-local.txt`n")
+        & $bootstrapPath -TargetPath $root -NoBeads
+        $before = [System.IO.File]::ReadAllText($excludePath)
+        [System.IO.File]::WriteAllText((Join-Path $root '.reports\report.md'), 'private report')
+        foreach ($path in @('.reports/INDEX.md', '.reports/report.md', 'existing-local.txt')) {
+            & git check-ignore -q -- $path
+            Assert-Equal 0 $LASTEXITCODE "Git の除外が無効です: $path"
+        }
+        $candidates = @(& git ls-files --others --exclude-standard -- .reports)
+        Assert-Equal 0 $LASTEXITCODE '追跡候補を取得できませんでした。'
+        Assert-Equal 0 $candidates.Count '調査記録が追跡候補へ出ています。'
+        & $bootstrapPath -TargetPath $root -NoBeads
+        Assert-Equal $before ([System.IO.File]::ReadAllText($excludePath)) '再実行で除外設定が変化しました。'
+    }
+    finally {
+        Set-Location -LiteralPath $originalLocation
+        Remove-Item -LiteralPath $root -Recurse -Force
+    }
+}
+
+Invoke-TestCase '再包含された調査パスの除外に失敗したら索引を書き込まない' {
+    foreach ($path in @('INDEX.md', 'report.md')) {
+        $root = New-TestDirectory
+        try {
+            [System.IO.File]::WriteAllText((Join-Path $root '.gitignore'), "!.reports/`n!.reports/$path`n")
+            $failure = $null
+            try { & $bootstrapPath -TargetPath $root -NoBeads } catch { $failure = $_ }
+            Assert-True ($null -ne $failure) '除外に失敗しても初期設定が成功しました。'
+            Assert-True ($failure.Exception.Message.Contains('Git の除外を確認できない')) '別の原因で失敗しました。'
+            Assert-True (-not (Test-Path -LiteralPath (Join-Path $root '.reports\INDEX.md'))) '除外が無効な状態で索引を書き込みました。'
+        }
+        finally { Remove-Item -LiteralPath $root -Recurse -Force }
+    }
+}
+
+Invoke-TestCase 'worktreeで共有除外ファイルを解決し調査記録を除外する' {
+    $root = New-TestDirectory
+    $originalLocation = Get-Location
+    try {
+        Set-Location -LiteralPath $root
+        & git init -b main
+        & git -c user.name=AllegroMoltoV -c user.email=allegromoltov@example.example commit --allow-empty -m '検証用の初期コミット'
+        Assert-Equal 0 $LASTEXITCODE '検証用コミットを作成できませんでした。'
+        $worktree = Join-Path $root 'linked-worktree'
+        & git worktree add --detach $worktree HEAD
+        Assert-Equal 0 $LASTEXITCODE 'worktree を作成できませんでした。'
+        & $bootstrapPath -TargetPath $worktree -NoBeads
+        Set-Location -LiteralPath $worktree
+        & git check-ignore -q -- .reports/INDEX.md
+        Assert-Equal 0 $LASTEXITCODE 'worktree の索引が除外されていません。'
+        Assert-PathExists (Join-Path $worktree '.reports\INDEX.md')
+    }
+    finally {
+        Set-Location -LiteralPath $originalLocation
+        Remove-Item -LiteralPath $root -Recurse -Force
     }
 }
 

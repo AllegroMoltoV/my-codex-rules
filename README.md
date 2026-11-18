@@ -58,7 +58,7 @@ PC 固有ルールを解除する場合は、`AGENTS.local.md` を空にする�
 3. コピーした INIT に要件、前提条件と制約、完了条件を書く
 4. そのプロジェクトで Codex を起動し、`$project-bootstrap を使って .prompts/INIT.md を実行してください`と依頼する
 
-`$project-bootstrap` が Git、除外設定、作業用ディレクトリ、文書索引、Beads を初期設定します。その後、要件に関係する現状を調査し、計画が必要な作業、複数セッションへまたがる作業、依存関係、ブロッカー、後続課題を Beads へ登録します。このスキルは状態を変更するため暗黙起動を無効にしています。Codex への依頼文に `$project-bootstrap` を含める必要があり、INIT 内の記載だけでは明示起動になりません。
+`$project-bootstrap` が Git、除外設定、作業用ディレクトリ、文書索引、Beads を初期設定します。調査レポートと保存用ログは `.reports/`、索引は `.reports/INDEX.md` に置きます。書込み前に実際の Git 除外を確認します。既存プロジェクトの追跡済みレポートは、内容を保全してから追跡を外す必要があります。その後、要件に関係する現状を調査し、計画が必要な作業、複数セッションへまたがる作業、依存関係、ブロッカー、後続課題を Beads へ登録します。このスキルは状態を変更するため暗黙起動を無効にしています。Codex への依頼文に `$project-bootstrap` を含める必要があり、INIT 内の記載だけでは明示起動になりません。
 
 `workspace-write` でも `.git/info/exclude` が保護される場合があります。その場合、Codex は対象プロジェクトと bootstrap コマンドに限定して権限昇格を求めます。拒否された場合は除外設定を未完了として報告し、サンドボックス全体を無効にしません。
 
@@ -134,7 +134,7 @@ pwsh -NoProfile -File scripts/teardown-beads.ps1
 pwsh -NoProfile -File scripts/teardown-beads.ps1 -Restore
 ```
 
-Git 管理下の `.prompts/INIT.md` だけを更新します。計画と合意は Beads に記録し、調査報告、実行ログなどの作業資料は `.appendix` または `.logs` に置きます。公開用の `.prompts` 配下へ混在させません。
+Git 管理下の `.prompts/INIT.md` だけを更新します。計画と合意は Beads に記録し、調査報告と保存用ログは除外済みの `.reports/` に置き、`.reports/INDEX.md` に所在を記録します。個人用または公開前の資料は `.appendix`、生の実行ログは `.logs` に置きます。公開用の `.prompts` 配下へ混在させません。
 
 `.prompts/DRAFT/` の文案、`.tmp/` の一時ファイル、`.logs/` のログは、各ディレクトリ直下にフラットに置きます。ファイル名の接頭辞は `yyyymmddnn` とし、同じ日付・同じディレクトリ内で `nn` を `01` から順に増やします。
 
@@ -154,7 +154,7 @@ bash tests/ShellSetup.Tests.sh
 python3 -B -m unittest discover -s tests -p 'test_*.py'
 ```
 
-隔離検証は一時的な `HOME` と `CODEX_HOME` を使い、実際のグローバル環境を変更しません。PowerShell のテストは PowerShell 7 が必要です。検証範囲と読込み方式は [PC 固有ルールの検証記録](docs/reports/2026-09-20-local-rules.md) を参照してください。
+隔離検証は一時的な `HOME` と `CODEX_HOME` を使い、実際のグローバル環境を変更しません。PowerShell のテストは PowerShell 7 が必要です。ルールの結合、PC 固有原本の保持、既存設定の保持を検証します。
 
 ## ライセンス
 
@@ -166,6 +166,7 @@ MIT License です。詳細は [LICENSE](LICENSE) を参照してください。
 
 | バージョン | 日付 | 内容 |
 |---|---|---|
+| v1.23.0 | 2026-11-18 | Claude Code 版 v2.28.0 を反映。調査レポートと保存用ログ、索引を Git 追跡対象外の `.reports/` へ移し、初期設定と除外確認を更新。既存の追跡済みレポートも公開対象から外した。過去の Git 履歴は維持する |
 | v1.22.0 | 2026-11-10 | Claude Code 版 v2.27.0 を反映。比較結果の文書化前に比較の組み合わせと結果をそろえ、欠けを明記する規則を追加。計画した比較の欠けを埋める検証を範囲拡大から除いた |
 | v1.21.0 | 2026-11-07 | Claude Code 版 v2.26.0 の文章規則とテストの判断基準を反映。`software-test` を追加し、Windows と macOS の標準セットアップに組み込んだ |
 | v1.20.0 | 2026-11-04 | Claude Code 版 v2.24.1〜v2.25.0 を反映。打ち合わせの事前確認、文章の強調表現、技術ブログの題名・抜粋・図の規則を更新 |
